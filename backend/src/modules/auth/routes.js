@@ -1,7 +1,7 @@
 const express = require('express');
 const { sendError } = require('../../shared/response');
 const { config } = require('../../config/db');
-const { authenticate, requireAdminHrTemp } = require('./middleware');
+const { requireAuth, requireRole } = require('../../shared/auth');
 const { AuthError } = require('./errors');
 const service = require('./service');
 
@@ -71,7 +71,7 @@ router.post(
 
 router.post(
   '/auth/logout',
-  authenticate,
+  requireAuth,
   handle(async (req, res) => {
     const rawToken = readRefreshToken(req);
     if (rawToken) {
@@ -84,7 +84,7 @@ router.post(
 
 router.post(
   '/auth/change-password',
-  authenticate,
+  requireAuth,
   handle(async (req, res) => {
     const { currentPassword, newPassword } = req.body || {};
     if (!currentPassword || !newPassword) {
@@ -131,10 +131,12 @@ router.post(
 
 // Path A — admin-provisioned account creation (design's Note). Always available regardless of
 // ENABLE_SELF_SERVICE_SIGNUP — see the Dual-Path Signup Handling note in the phase spec.
+// Phase 03: the Phase 02 temporary inline role check has been replaced entirely by the shared
+// requireAuth / requireRole('admin_hr') primitives below — no leftover inline check.
 router.post(
   '/employees/provision',
-  authenticate,
-  requireAdminHrTemp,
+  requireAuth,
+  requireRole('admin_hr'),
   handle(async (req, res) => {
     const { firstName, lastName, email, dateOfJoining, department, location, role } = req.body || {};
     if (!firstName || !lastName || !email || !dateOfJoining) {
