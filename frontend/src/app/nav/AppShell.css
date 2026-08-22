@@ -1,0 +1,13 @@
+.app-shell {
+  min-height: 100vh;
+}
+
+.app-shell__content {
+  padding: 1rem 0;
+}
+
+.placeholder-page {
+  display: grid;
+  place-items: center;
+  padding: 4rem 0;
+}

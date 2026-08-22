@@ -12,6 +12,7 @@
 import { createServer } from 'vite';
 import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
+import { act, create } from 'react-test-renderer';
 import path from 'node:path';
 
 const root = path.resolve(import.meta.dirname, '..');
@@ -96,6 +97,28 @@ try {
   const providerMarkup = renderToStaticMarkup(React.createElement(AuthProvider, null, React.createElement(Consumer)));
   if (!providerMarkup.includes('NO_USER')) {
     fail(`AuthProvider should default to no user when window/localStorage are unavailable, got: ${providerMarkup}`);
+  }
+
+  // 5. RequireAuth — Phase 05 now actually relies on the redirect firing (AppShell wraps every
+  // authenticated route in it), so this confirms the effect itself runs, not just the static
+  // render shape checked above. renderToStaticMarkup never runs effects; react-test-renderer
+  // does, so this uses that instead — with a minimal stubbed `window` (Node has none) just
+  // sufficient for RequireAuth's single `window.location.assign(...)` call. Kept last: mixing
+  // react-test-renderer and react-dom/server against the same context in one process triggers a
+  // harmless "multiple renderers" warning if react-dom/server runs afterward — sequencing avoids
+  // the noise without changing behavior.
+  const assignCalls = [];
+  const originalWindow = globalThis.window;
+  globalThis.window = { location: { assign: (url) => assignCalls.push(url) } };
+  try {
+    await act(async () => {
+      create(withUser(null, React.createElement(RequireAuth, null, 'SECRET')));
+    });
+  } finally {
+    globalThis.window = originalWindow;
+  }
+  if (!assignCalls.includes('/signin')) {
+    fail(`RequireAuth should redirect to /signin when no user is present, got redirect calls: ${JSON.stringify(assignCalls)}`);
   }
 } finally {
   await server.close();

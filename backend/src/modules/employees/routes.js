@@ -73,6 +73,32 @@ function validateSkills(fields) {
   }
 }
 
+// [RECOMMENDATION pending D-14] GET /employees (this phase's new listing endpoint) returns a
+// DELIBERATELY MINIMAL projection to any authenticated user, regardless of role: { id, name,
+// avatarUrl, statusIcon }. It does NOT return Private Info, Bank Details, Resume text, or
+// anything Phase 04 guards. Clicking a card navigates to /profile/:id (Phase 04's existing
+// route), which will correctly 403 for a non-owner, non-admin Employee per Phase 04's UNCHANGED
+// guard on GET /employees/:id below — this phase does not loosen that guard.
+// TODO(D-14): if the decision is that Employees CAN view coworkers' full profiles read-only,
+// Phase 04's requireSelfOrRole guard on GET /employees/:id needs a third branch (allow any
+// authenticated caller, but strip Private Info/Bank Details for non-owner-non-admin callers) —
+// that change belongs in Phase 04's code, not here. This phase's job is only to make the
+// directory itself functional without silently widening Phase 04's access control.
+//
+// TODO: no empty-state or zero-results handling is specified by either source for this list.
+// This returns a plain empty array on zero results and lets the frontend render its own
+// "no employees found" state — not a backend concern beyond returning an empty array correctly.
+router.get(
+  '/employees',
+  requireAuth,
+  handle(async (req, res) => {
+    const search = typeof req.query.search === 'string' ? req.query.search : undefined;
+    const page = req.query.page ? parseInt(req.query.page, 10) : 1;
+    const result = await service.listEmployees({ search, page });
+    return res.status(200).json(result);
+  })
+);
+
 // GET/PATCH /employees/me must be registered before GET/PATCH /employees/:id — otherwise
 // Express would capture "me" as the :id param.
 router.get(

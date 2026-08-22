@@ -1,4 +1,5 @@
 import { API_BASE_URL } from './api';
+import { initials } from './initials';
 
 export function ProfileHeader({ profile, editable, onAvatarUpload }) {
   function handleFileChange(e) {
@@ -30,14 +31,4 @@ export function ProfileHeader({ profile, editable, onAvatarUpload }) {
       </div>
     </header>
   );
-}
-
-function initials(name) {
-  return (name || '')
-    .split(' ')
-    .map((part) => part[0])
-    .filter(Boolean)
-    .slice(0, 2)
-    .join('')
-    .toUpperCase();
 }

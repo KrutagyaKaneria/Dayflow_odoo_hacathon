@@ -1,0 +1,54 @@
+.signin-page {
+  display: grid;
+  place-items: center;
+  min-height: 100vh;
+}
+
+.signin-page__form {
+  width: min(340px, 90vw);
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.signin-page__form h1 {
+  font-size: 1.35rem;
+  margin: 0 0 0.5rem;
+}
+
+.signin-page__form label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  font-size: 0.9rem;
+  color: #4b5563;
+}
+
+.signin-page__form input {
+  padding: 0.5rem;
+  border: 1px solid #d1d5db;
+  border-radius: 4px;
+  font-size: 1rem;
+}
+
+.signin-page__form button {
+  margin-top: 0.5rem;
+  padding: 0.6rem;
+  border: none;
+  border-radius: 4px;
+  background: #111827;
+  color: #fff;
+  cursor: pointer;
+  font-size: 1rem;
+}
+
+.signin-page__form button:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.signin-page__error {
+  color: #b91c1c;
+  font-size: 0.85rem;
+  margin: 0;
+}

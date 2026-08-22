@@ -1,0 +1,96 @@
+.top-nav {
+  display: flex;
+  align-items: center;
+  gap: 2rem;
+  padding: 0.75rem 1.5rem;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.top-nav__logo {
+  font-weight: 700;
+  font-size: 1.1rem;
+}
+
+.top-nav__tabs {
+  display: flex;
+  gap: 1.5rem;
+  flex: 1;
+}
+
+.top-nav__tab {
+  text-decoration: none;
+  color: #6b7280;
+  font-size: 0.95rem;
+}
+
+.top-nav__tab.is-active {
+  color: #111827;
+  font-weight: 600;
+}
+
+.top-nav__account {
+  position: relative;
+}
+
+.top-nav__avatar-button {
+  position: relative;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+  display: flex;
+  align-items: center;
+}
+
+.top-nav__avatar {
+  font-size: 1.5rem;
+}
+
+.top-nav__status-dot {
+  position: absolute;
+  right: -2px;
+  bottom: -2px;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  border: 2px solid #fff;
+}
+
+.top-nav__status-dot--red {
+  background: #dc2626;
+}
+
+.top-nav__status-dot--green {
+  background: #16a34a;
+}
+
+.top-nav__menu {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 0.5rem);
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+  display: flex;
+  flex-direction: column;
+  min-width: 140px;
+  z-index: 10;
+}
+
+.top-nav__menu a,
+.top-nav__menu button {
+  padding: 0.6rem 0.9rem;
+  text-align: left;
+  background: none;
+  border: none;
+  text-decoration: none;
+  color: #111827;
+  font-size: 0.9rem;
+  cursor: pointer;
+}
+
+.top-nav__menu a:hover,
+.top-nav__menu button:hover {
+  background: #f3f4f6;
+}

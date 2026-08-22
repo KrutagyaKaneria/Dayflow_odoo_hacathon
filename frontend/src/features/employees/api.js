@@ -1,6 +1,6 @@
-// TODO: move to a Vite env var (import.meta.env) once the frontend build config grows one —
-// not scoped to this phase, matches the backend's default PORT (see backend/.env.example).
-export const API_BASE_URL = 'http://localhost:4000';
+import { API_BASE_URL } from '../../app/apiBase';
+
+export { API_BASE_URL };
 
 async function request(path, { method = 'GET', accessToken, body, isFormData } = {}) {
   const headers = {};
@@ -39,4 +39,14 @@ export function uploadAvatar(accessToken, file) {
   const formData = new FormData();
   formData.append('avatar', file);
   return request('/employees/me/avatar', { method: 'POST', accessToken, body: formData, isFormData: true });
+}
+
+// Phase 05 — directory listing. Deliberately minimal projection server-side (see
+// backend/src/modules/employees/routes.js's D-14 note) — any authenticated user, any role.
+export function fetchEmployees(accessToken, { search = '', page = 1 } = {}) {
+  const params = new URLSearchParams();
+  if (search) params.set('search', search);
+  if (page && page !== 1) params.set('page', String(page));
+  const qs = params.toString();
+  return request(`/employees${qs ? `?${qs}` : ''}`, { accessToken });
 }

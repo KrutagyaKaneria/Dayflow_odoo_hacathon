@@ -7,7 +7,7 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "test": "node scripts/smoke.mjs && node scripts/smoke-auth.mjs && node scripts/smoke-profile.mjs"
+    "test": "node scripts/smoke.mjs && node scripts/smoke-auth.mjs && node scripts/smoke-profile.mjs && node scripts/smoke-directory.mjs"
   },
   "dependencies": {
     "react": "^18.3.1",
@@ -16,6 +16,7 @@
   },
   "devDependencies": {
     "@vitejs/plugin-react": "^4.3.4",
+    "react-test-renderer": "^18.3.1",
     "vite": "^5.4.11"
   }
 }
