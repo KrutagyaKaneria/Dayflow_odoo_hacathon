@@ -5,6 +5,7 @@ const { checkDbConnection } = require('./config/db');
 const { sendError } = require('./shared/response');
 const authRoutes = require('./modules/auth/routes');
 const employeesRoutes = require('./modules/employees/routes');
+const attendanceRoutes = require('./modules/attendance/routes');
 
 function createApp({ db = { checkDbConnection } } = {}) {
   const app = express();
@@ -43,6 +44,10 @@ function createApp({ db = { checkDbConnection } } = {}) {
 
   // Phase 04 — employee profile management: /employees/me, /employees/:id.
   app.use(employeesRoutes);
+
+  // Phase 06 — attendance: /attendance/check-in, /attendance/check-out, /attendance/today,
+  // /attendance/me, /attendance (Admin day-scoped list).
+  app.use(attendanceRoutes);
 
   return app;
 }

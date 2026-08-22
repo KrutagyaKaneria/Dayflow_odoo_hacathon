@@ -1,8 +1,10 @@
-// Dayflow HRMS — schema through Phase 04 (foundational model, auth, RBAC, employee profiles).
+// Dayflow HRMS — schema through Phase 06 (foundational model, auth, RBAC, employee profiles,
+// attendance).
 //
 // Scope so far: organizations, users, employee_profiles (+ Phase 04's Resume/Private Info
-// fields), employee_bank_details, refresh_tokens, email_verification_tokens. Attendance, Leave,
-// Salary, and Documents belong to later phases and are deliberately absent here.
+// fields), employee_bank_details, refresh_tokens, email_verification_tokens, attendance_records
+// (Phase 06). Leave, Salary, and Documents belong to later phases and are deliberately absent
+// here.
 //
 // Open decisions that shaped this schema — do NOT resolve them silently:
 //   D-01: registration model (self-service per PDF §3.1.1 vs admin-provisioned
@@ -119,6 +121,7 @@ model EmployeeProfile {
   manager      EmployeeProfile?     @relation("EmployeeManager", fields: [managerId], references: [id], onDelete: SetNull, onUpdate: Cascade)
   reports      EmployeeProfile[]    @relation("EmployeeManager")
   bankDetails  EmployeeBankDetails?
+  attendanceRecords AttendanceRecord[]
 
   // TODO(D-21): the exact employee-editable field set (PDF's narrow address/phone/picture vs. the
   // design's broader-looking editable icons) is resolved as a documented default in
@@ -183,4 +186,40 @@ model EmailVerificationToken {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: Cascade)
 
   @@map("email_verification_tokens")
+}
+
+/// Phase 06 — attendance. All four PDF §3.4.1 values are defined from day one so no later
+/// migration alters the type — 'leave' (Phase 09's Leave→Attendance sync) and 'absent'
+/// (requires a working-day calendar that doesn't exist until Phase 07/08) are defined but never
+/// written by this phase. See src/modules/attendance/attendancePolicy.js.
+enum AttendanceStatus {
+  present
+  absent
+  half_day
+  leave
+}
+
+/// Phase 06. One row per employee per calendar date ([RECOMMENDATION pending D-25] — see the
+/// unique constraint and attendancePolicy.js). Attaches to EmployeeProfile, not User, matching
+/// Phase 04's precedent. ON DELETE CASCADE diverges from the SET NULL convention used for
+/// *optional* FKs elsewhere in this schema — this FK is mandatory, so cascade is correct here,
+/// not an inconsistency (see the migration comment).
+model AttendanceRecord {
+  id                String            @id @default(uuid()) @db.Uuid
+  employeeProfileId String            @map("employee_profile_id") @db.Uuid
+  attendanceDate    DateTime          @map("attendance_date") @db.Date
+  checkInAt         DateTime          @map("check_in_at") @db.Timestamptz(3)
+  checkOutAt        DateTime?         @map("check_out_at") @db.Timestamptz(3)
+  workHours         Decimal?          @map("work_hours") @db.Decimal(5, 2)
+  extraHours        Decimal?          @map("extra_hours") @db.Decimal(5, 2)
+  status            AttendanceStatus
+  createdAt         DateTime          @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt         DateTime          @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  employeeProfile EmployeeProfile @relation(fields: [employeeProfileId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+
+  // TODO(D-25): drop this constraint if multi-session-per-day is adopted — see migration comment.
+  @@unique([employeeProfileId, attendanceDate])
+  @@index([attendanceDate])
+  @@map("attendance_records")
 }

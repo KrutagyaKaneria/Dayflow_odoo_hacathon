@@ -28,6 +28,36 @@
   font-weight: 600;
 }
 
+.attendance-widget {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.85rem;
+}
+
+.attendance-widget button {
+  border: none;
+  border-radius: 6px;
+  padding: 0.4rem 0.8rem;
+  cursor: pointer;
+  font-size: 0.85rem;
+  background: #111827;
+  color: #fff;
+}
+
+.attendance-widget button:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.attendance-widget--active .attendance-widget__since {
+  color: #4b5563;
+}
+
+.attendance-widget--done {
+  color: #6b7280;
+}
+
 .top-nav__account {
   position: relative;
 }

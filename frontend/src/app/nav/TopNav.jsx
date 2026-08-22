@@ -2,6 +2,9 @@ import { useState } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '../auth';
 import { logout as logoutRequest } from '../../features/auth/api';
+import { useTodayAttendance } from '../../features/attendance/useTodayAttendance';
+import { AttendanceWidget } from './AttendanceWidget';
+import { isNavStatusDotGreen } from './attendanceStatusDot';
 import './TopNav.css';
 
 function navLinkClass({ isActive }) {
@@ -14,6 +17,8 @@ export function TopNav() {
   const { accessToken, logout } = useAuth();
   const navigate = useNavigate();
   const [menuOpen, setMenuOpen] = useState(false);
+  const attendance = useTodayAttendance();
+  const isCheckedInNow = isNavStatusDotGreen(attendance);
 
   async function handleLogout() {
     setMenuOpen(false);
@@ -44,6 +49,8 @@ export function TopNav() {
         </NavLink>
       </nav>
 
+      <AttendanceWidget attendance={attendance} />
+
       <div className="top-nav__account">
         <button
           type="button"
@@ -55,10 +62,10 @@ export function TopNav() {
           <span className="top-nav__avatar" aria-hidden="true">
             👤
           </span>
-          {/* TODO(Phase 06): status dot should turn green on successful check-in per the
-              design's explicit note. Static red stub only this phase — not wired to any
-              endpoint. */}
-          <span className="top-nav__status-dot top-nav__status-dot--red" aria-hidden="true" />
+          <span
+            className={`top-nav__status-dot ${isCheckedInNow ? 'top-nav__status-dot--green' : 'top-nav__status-dot--red'}`}
+            aria-hidden="true"
+          />
         </button>
         {menuOpen && (
           <div className="top-nav__menu">

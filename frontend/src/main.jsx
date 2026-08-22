@@ -7,6 +7,7 @@ import { PlaceholderPage } from './app/nav/PlaceholderPage.jsx';
 import { SignInPage } from './features/auth/SignInPage.jsx';
 import { DirectoryPage } from './features/employees/DirectoryPage.jsx';
 import { ProfilePage } from './features/employees/ProfilePage.jsx';
+import { AttendancePage } from './features/attendance/AttendancePage.jsx';
 
 // Phase 05: the Employees directory ("/") is the default post-login landing route, per the
 // design's explicit "must land on this page" instruction (D-02 default — see
@@ -21,7 +22,8 @@ ReactDOM.createRoot(document.getElementById('root')).render(
           <Route path="/signin" element={<SignInPage />} />
           <Route element={<AppShell />}>
             <Route path="/" element={<DirectoryPage />} />
-            <Route path="/attendance" element={<PlaceholderPage title="Attendance" />} />
+            {/* Phase 06 replaces Phase 05's placeholder here. */}
+            <Route path="/attendance" element={<AttendancePage />} />
             <Route path="/time-off" element={<PlaceholderPage title="Time Off" />} />
             <Route path="/profile/me" element={<ProfilePage mode="me" />} />
             <Route path="/profile/:id" element={<ProfilePage mode="id" />} />
