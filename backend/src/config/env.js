@@ -20,6 +20,13 @@ function loadConfig() {
     throw new Error('DATABASE_URL must be a valid postgresql:// connection string.');
   }
 
+  // Phase 02 — authentication. ENABLE_SELF_SERVICE_SIGNUP (D-01, still open) is deliberately NOT
+  // cached here: it's read live from process.env at request time (see modules/auth/service.js) so
+  // integration tests can flip it per-test without reloading modules.
+  if (!process.env.JWT_ACCESS_SECRET) {
+    throw new Error('Missing required environment variable JWT_ACCESS_SECRET.');
+  }
+
   return {
     nodeEnv,
     isProduction: nodeEnv === 'production',
@@ -27,6 +34,9 @@ function loadConfig() {
     port: parseInt(process.env.PORT, 10) || 4000,
     databaseUrl: process.env.DATABASE_URL,
     databaseUrlTest: process.env.DATABASE_URL_TEST || null,
+    jwtAccessSecret: process.env.JWT_ACCESS_SECRET,
+    jwtAccessTtl: process.env.JWT_ACCESS_TTL || '15m',
+    refreshTokenTtlDays: parseInt(process.env.REFRESH_TOKEN_TTL_DAYS, 10) || 7,
   };
 }
 

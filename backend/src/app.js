@@ -1,11 +1,14 @@
 const express = require('express');
+const cookieParser = require('cookie-parser');
 const { checkDbConnection } = require('./config/db');
 const { sendError } = require('./shared/response');
+const authRoutes = require('./modules/auth/routes');
 
 function createApp({ db = { checkDbConnection } } = {}) {
   const app = express();
 
   app.use(express.json());
+  app.use(cookieParser());
 
   // TEMP - revisit in Phase 10: bare-minimum CORS allow for local frontend dev only.
   // Full security middleware (CORS policy, rate limiting, etc.) begins in Phase 02/10.
@@ -27,6 +30,9 @@ function createApp({ db = { checkDbConnection } } = {}) {
       sendError(res, 503, 'SERVICE_UNAVAILABLE', 'Database connection failed.');
     }
   });
+
+  // Phase 02 — auth: /auth/* and /employees/provision.
+  app.use(authRoutes);
 
   return app;
 }

@@ -76,7 +76,7 @@ afterAll(async () => {
   });
 });
 
-test('migrations apply cleanly on a fresh database and create all three tables', () => {
+test('migrations apply cleanly on a fresh database and create all tables (Phase 01 + Phase 02)', () => {
   runMigrateDeploy();
 
   const client = new Client({ connectionString: scratchUrl() });
@@ -89,8 +89,10 @@ test('migrations apply cleanly on a fresh database and create all three tables',
       .then((res) => {
         expect(res.rows.map((r) => r.table_name)).toEqual([
           '_prisma_migrations',
+          'email_verification_tokens',
           'employee_profiles',
           'organizations',
+          'refresh_tokens',
           'users',
         ]);
       })

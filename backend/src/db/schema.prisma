@@ -61,6 +61,8 @@ model User {
   createdBy        User?             @relation("UserCreatedBy", fields: [createdByUserId], references: [id], onDelete: SetNull, onUpdate: Cascade)
   createdUsers     User[]            @relation("UserCreatedBy")
   employeeProfile  EmployeeProfile?
+  refreshTokens           RefreshToken[]
+  emailVerificationTokens EmailVerificationToken[]
 
   // TODO(D-01): registration model (self-service per PDF §3.1.1 vs. admin-provisioned per design Note) is unresolved.
   // This schema supports either outcome:
@@ -106,4 +108,35 @@ model EmployeeProfile {
   // semantics are decided.
 
   @@map("employee_profiles")
+}
+
+/// Phase 02 — auth. Opaque refresh tokens are stored hashed; the raw value only ever exists
+/// client-side and in the response that issued it. Rotated on every use (Security Baseline §5.5,
+/// a [RECOMMENDATION] default — not stated as a requirement by either source document).
+model RefreshToken {
+  id        String    @id @default(uuid()) @db.Uuid
+  userId    String    @map("user_id") @db.Uuid
+  tokenHash String    @unique @map("token_hash") @db.VarChar(255)
+  expiresAt DateTime  @map("expires_at") @db.Timestamp(3)
+  revokedAt DateTime? @map("revoked_at") @db.Timestamp(3)
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamp(3)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+
+  @@map("refresh_tokens")
+}
+
+/// Phase 02 — auth, Path B (self-service signup) only. Path A (admin-provisioned) accounts set
+/// users.email_verified_at directly at creation and never generate a row here.
+model EmailVerificationToken {
+  id        String    @id @default(uuid()) @db.Uuid
+  userId    String    @map("user_id") @db.Uuid
+  tokenHash String    @unique @map("token_hash") @db.VarChar(255)
+  expiresAt DateTime  @map("expires_at") @db.Timestamp(3)
+  usedAt    DateTime? @map("used_at") @db.Timestamp(3)
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamp(3)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+
+  @@map("email_verification_tokens")
 }
