@@ -20,3 +20,6 @@ coverage/
 
 # Prisma generated client (regenerated on install)
 backend/src/generated/
+
+# Phase 04 — locally-stored avatar uploads (dev/test only, not committed)
+backend/uploads/

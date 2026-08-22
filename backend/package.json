@@ -24,7 +24,8 @@
     "cookie-parser": "^1.4.7",
     "dotenv": "^16.4.7",
     "express": "^4.21.2",
-    "jsonwebtoken": "^9.0.3"
+    "jsonwebtoken": "^9.0.3",
+    "multer": "^2.2.0"
   },
   "devDependencies": {
     "jest": "^29.7.0",

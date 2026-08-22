@@ -1,13 +1,18 @@
-// Dayflow HRMS — Phase 01: foundational data model & environment.
+// Dayflow HRMS — schema through Phase 04 (foundational model, auth, RBAC, employee profiles).
 //
-// Scope of this schema (Phase 01 ONLY): organizations, users, employee_profiles.
-// Every other entity on the master roadmap (Attendance, Leave, Salary, etc.)
-// belongs to later phases and is deliberately absent here.
+// Scope so far: organizations, users, employee_profiles (+ Phase 04's Resume/Private Info
+// fields), employee_bank_details, refresh_tokens, email_verification_tokens. Attendance, Leave,
+// Salary, and Documents belong to later phases and are deliberately absent here.
 //
 // Open decisions that shaped this schema — do NOT resolve them silently:
 //   D-01: registration model (self-service per PDF §3.1.1 vs admin-provisioned
 //         per design note) — see the `users` model comments.
-//   D-21: exact employee-editable field set — see `employee_profiles` comments.
+//   D-21: exact employee-editable field set — see `employee_profiles` comments and
+//         src/modules/employees/editPolicy.js.
+// TODO(D-13): Documents section (PDF §3.3.1) — still open, deliberately not built. Neither
+// source document specifies its fields, upload behavior, or storage model, and it has no
+// corresponding design screen at all. No table exists for it here; do not invent one from
+// nothing when a later phase picks this up — confirm the requirements first.
 
 generator client {
   provider = "prisma-client-js"
@@ -92,22 +97,61 @@ model EmployeeProfile {
   createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamp(3)
   updatedAt      DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamp(3)
 
-  user         User              @relation(fields: [userId], references: [id], onDelete: Restrict, onUpdate: Cascade)
-  organization Organization?     @relation(fields: [organizationId], references: [id], onDelete: SetNull, onUpdate: Cascade)
-  manager      EmployeeProfile?  @relation("EmployeeManager", fields: [managerId], references: [id], onDelete: SetNull, onUpdate: Cascade)
-  reports      EmployeeProfile[] @relation("EmployeeManager")
+  // Phase 04 — Resume tab.
+  avatarUrl String? @map("avatar_url") @db.VarChar(255)
+  about     String? @db.Text
+  jobLikes  String? @map("job_likes") @db.Text
+  skills    Json    @default("[]")
+
+  // Phase 04 — Private Info tab. `phone` doubles as the PDF's minimum editable set alongside
+  // residing_address and avatar_url; personalEmail is deliberately separate from users.email
+  // (the account/login email).
+  phone            String?   @db.VarChar(50)
+  dateOfBirth      DateTime? @map("date_of_birth") @db.Date
+  residingAddress  String?   @map("residing_address") @db.Text
+  nationality      String?   @db.VarChar(255)
+  personalEmail    String?   @map("personal_email") @db.VarChar(255)
+  gender           String?   @db.VarChar(50)
+  maritalStatus    String?   @map("marital_status") @db.VarChar(50)
+
+  user         User                 @relation(fields: [userId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  organization Organization?        @relation(fields: [organizationId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  manager      EmployeeProfile?     @relation("EmployeeManager", fields: [managerId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  reports      EmployeeProfile[]    @relation("EmployeeManager")
+  bankDetails  EmployeeBankDetails?
 
   // TODO(D-21): the exact employee-editable field set (PDF's narrow address/phone/picture vs. the
-  // design's broader-looking editable icons) is a Phase 4 concern, not a Phase 1 schema concern.
-  // The fields above are CORE IDENTITY FIELDS only (identification + linking); they are NOT a
-  // statement about editability. Resume/Private Info/Bank Details/Salary/Documents fields are
-  // deliberately absent — they belong to Phases 4 and 8.
+  // design's broader-looking editable icons) is resolved as a documented default in
+  // src/modules/employees/editPolicy.js (EMPLOYEE_EDITABLE_FIELDS) — that file is the single
+  // place to change if D-21 is decided differently. Do not add per-field permission logic here
+  // or anywhere else.
 
   // TODO(confirm delete behavior before Phase 3+): user -> profile uses ON DELETE RESTRICT so a
   // User's Employee Profile is never cascade-deleted implicitly. Revisit once account-deletion
   // semantics are decided.
 
   @@map("employee_profiles")
+}
+
+/// Phase 04. One-to-one with EmployeeProfile. Admin-only editable (src/modules/employees/
+/// editPolicy.js ADMIN_EDITABLE_BANK_FIELDS) — no employee-editable path exists for this table.
+/// [RECOMMENDATION pending Phase 10 hardening]: accountNumber/panNo are high-sensitivity PII,
+/// stored in plaintext with standard DB access controls only — see the migration comment.
+model EmployeeBankDetails {
+  id                String   @id @default(uuid()) @db.Uuid
+  employeeProfileId String   @unique @map("employee_profile_id") @db.Uuid
+  accountNumber     String?  @map("account_number") @db.VarChar(255)
+  bankName          String?  @map("bank_name") @db.VarChar(255)
+  ifscCode          String?  @map("ifsc_code") @db.VarChar(50)
+  panNo             String?  @map("pan_no") @db.VarChar(50)
+  uanNo             String?  @map("uan_no") @db.VarChar(50)
+  empCode           String?  @map("emp_code") @db.VarChar(50)
+  createdAt         DateTime @default(now()) @map("created_at") @db.Timestamp(3)
+  updatedAt         DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamp(3)
+
+  employeeProfile EmployeeProfile @relation(fields: [employeeProfileId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+
+  @@map("employee_bank_details")
 }
 
 /// Phase 02 — auth. Opaque refresh tokens are stored hashed; the raw value only ever exists

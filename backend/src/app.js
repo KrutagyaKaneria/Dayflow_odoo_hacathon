@@ -1,14 +1,21 @@
+const path = require('path');
 const express = require('express');
 const cookieParser = require('cookie-parser');
 const { checkDbConnection } = require('./config/db');
 const { sendError } = require('./shared/response');
 const authRoutes = require('./modules/auth/routes');
+const employeesRoutes = require('./modules/employees/routes');
 
 function createApp({ db = { checkDbConnection } } = {}) {
   const app = express();
 
   app.use(express.json());
   app.use(cookieParser());
+
+  // Phase 04 — serves locally-stored avatar uploads (see modules/employees/avatarUpload.js).
+  // [RECOMMENDATION] Local disk is a documented default for this phase; no object-storage
+  // service (S3 etc.) is being introduced ad hoc here.
+  app.use('/uploads', express.static(path.join(__dirname, '..', 'uploads')));
 
   // TEMP - revisit in Phase 10: bare-minimum CORS allow for local frontend dev only.
   // Full security middleware (CORS policy, rate limiting, etc.) begins in Phase 02/10.
@@ -33,6 +40,9 @@ function createApp({ db = { checkDbConnection } } = {}) {
 
   // Phase 02 — auth: /auth/* and /employees/provision.
   app.use(authRoutes);
+
+  // Phase 04 — employee profile management: /employees/me, /employees/:id.
+  app.use(employeesRoutes);
 
   return app;
 }

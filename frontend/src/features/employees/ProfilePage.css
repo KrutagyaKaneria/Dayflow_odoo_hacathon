@@ -1,0 +1,208 @@
+.profile-page {
+  width: min(880px, 92vw);
+  margin: 2rem auto;
+  text-align: left;
+}
+
+.profile-page__notice {
+  text-align: center;
+  color: #6b7280;
+}
+
+.profile-page__notice--error {
+  color: #b91c1c;
+}
+
+.profile-page__view-only-banner {
+  display: inline-block;
+  margin-bottom: 1rem;
+  padding: 0.25rem 0.75rem;
+  border-radius: 999px;
+  background: #f3f4f6;
+  color: #4b5563;
+  font-size: 0.85rem;
+}
+
+.profile-header {
+  display: flex;
+  align-items: center;
+  gap: 1.25rem;
+  margin-bottom: 1.5rem;
+}
+
+.profile-header__avatar-wrap {
+  position: relative;
+  flex-shrink: 0;
+}
+
+.profile-header__avatar {
+  width: 72px;
+  height: 72px;
+  border-radius: 50%;
+  object-fit: cover;
+  background: #e5e7eb;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 600;
+  color: #4b5563;
+}
+
+.profile-header__avatar-edit {
+  position: absolute;
+  right: -4px;
+  bottom: -4px;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: #fff;
+  border: 1px solid #d1d5db;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  font-size: 0.75rem;
+}
+
+.profile-header h1 {
+  margin: 0;
+  font-size: 1.5rem;
+}
+
+.profile-header__meta {
+  margin: 0.25rem 0 0;
+  color: #6b7280;
+}
+
+.profile-page__tabs {
+  display: flex;
+  gap: 0.5rem;
+  border-bottom: 1px solid #e5e7eb;
+  margin-bottom: 1.5rem;
+}
+
+.profile-page__tabs button {
+  background: none;
+  border: none;
+  padding: 0.6rem 1rem;
+  cursor: pointer;
+  color: #6b7280;
+  border-bottom: 2px solid transparent;
+  font-size: 0.95rem;
+}
+
+.profile-page__tabs button.is-active {
+  color: #111827;
+  border-bottom-color: #111827;
+  font-weight: 600;
+}
+
+.tab-stub {
+  color: #9ca3af;
+  font-style: italic;
+}
+
+.field-row {
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+  padding: 0.5rem 0;
+  border-bottom: 1px solid #f3f4f6;
+}
+
+.field-row__label {
+  width: 160px;
+  flex-shrink: 0;
+  color: #6b7280;
+  font-size: 0.9rem;
+}
+
+.field-row__value {
+  flex: 1;
+}
+
+.field-row__edit {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: #6b7280;
+}
+
+.field-row--editing textarea,
+.field-row--editing input {
+  flex: 1;
+  padding: 0.35rem;
+  border: 1px solid #d1d5db;
+  border-radius: 4px;
+}
+
+.private-info-tab {
+  display: grid;
+  grid-template-columns: 1fr 260px;
+  gap: 2rem;
+}
+
+.skills-panel__list {
+  list-style: none;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin: 0.5rem 0;
+}
+
+.skills-panel__list li {
+  background: #f3f4f6;
+  padding: 0.25rem 0.6rem;
+  border-radius: 999px;
+  font-size: 0.85rem;
+}
+
+.skills-panel__empty {
+  color: #9ca3af;
+  background: none !important;
+  padding: 0 !important;
+}
+
+.skills-panel__add {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.skills-panel__add input {
+  padding: 0.35rem;
+  border: 1px solid #d1d5db;
+  border-radius: 4px;
+}
+
+.bank-details-block {
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  padding: 1rem;
+  height: fit-content;
+}
+
+.bank-details-block h3 {
+  margin-top: 0;
+  font-size: 1rem;
+}
+
+.bank-details-block dl {
+  margin: 0;
+}
+
+.bank-details-block__row {
+  display: flex;
+  justify-content: space-between;
+  padding: 0.35rem 0;
+  border-bottom: 1px solid #f3f4f6;
+  font-size: 0.9rem;
+}
+
+.bank-details-block dt {
+  color: #6b7280;
+}
+
+.bank-details-block dd {
+  margin: 0;
+}
