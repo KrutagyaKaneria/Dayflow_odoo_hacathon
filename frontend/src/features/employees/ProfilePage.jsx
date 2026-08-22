@@ -5,7 +5,7 @@ import { fetchMyProfile, fetchProfileById, updateMyProfile, uploadAvatar } from 
 import { ProfileHeader } from './ProfileHeader';
 import { ResumeTab } from './tabs/ResumeTab';
 import { PrivateInfoTab } from './tabs/PrivateInfoTab';
-import { SalaryInfoStub } from './tabs/SalaryInfoStub';
+import { SalaryInfoTab } from './tabs/SalaryInfoTab';
 import { SecurityStub } from './tabs/SecurityStub';
 import './ProfilePage.css';
 
@@ -114,7 +114,9 @@ export function ProfilePage({ mode }) {
         {activeTab === 'private-info' && (
           <PrivateInfoTab profile={profile} editable={isOwnProfile} onSave={handleFieldSave} />
         )}
-        {activeTab === 'salary-info' && <SalaryInfoStub />}
+        {activeTab === 'salary-info' && (
+          <SalaryInfoTab employeeId={targetId} isOwnProfile={isOwnProfile} viewerRole={user.role} />
+        )}
         {activeTab === 'security' && showSecurityTab && <SecurityStub />}
       </div>
     </div>

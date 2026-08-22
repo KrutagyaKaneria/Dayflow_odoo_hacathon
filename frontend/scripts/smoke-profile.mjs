@@ -26,7 +26,6 @@ try {
   const { ResumeTab } = await server.ssrLoadModule('/src/features/employees/tabs/ResumeTab.jsx');
   const { PrivateInfoTab } = await server.ssrLoadModule('/src/features/employees/tabs/PrivateInfoTab.jsx');
   const { BankDetailsBlock } = await server.ssrLoadModule('/src/features/employees/BankDetailsBlock.jsx');
-  const { SalaryInfoStub } = await server.ssrLoadModule('/src/features/employees/tabs/SalaryInfoStub.jsx');
   const { SecurityStub } = await server.ssrLoadModule('/src/features/employees/tabs/SecurityStub.jsx');
 
   // 1. computeTabSet — the three viewing contexts.
@@ -108,11 +107,8 @@ try {
     fail('BankDetailsBlock should render the supplied bank details');
   }
 
-  // 4. Stub tabs render placeholder text only, no functional content.
-  const salaryMarkup = renderToStaticMarkup(React.createElement(SalaryInfoStub));
-  if (!salaryMarkup.toLowerCase().includes('coming soon')) {
-    fail('SalaryInfoStub should render a visible-but-empty placeholder');
-  }
+  // 4. Security remains a stub tab (Salary Info got real content in Phase 08 — see
+  // scripts/smoke-payroll.mjs for its behavior).
   const securityMarkup = renderToStaticMarkup(React.createElement(SecurityStub));
   if (!securityMarkup.toLowerCase().includes('coming soon')) {
     fail('SecurityStub should render a visible-but-empty placeholder');

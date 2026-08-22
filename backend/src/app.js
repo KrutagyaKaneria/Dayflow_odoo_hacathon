@@ -7,6 +7,7 @@ const authRoutes = require('./modules/auth/routes');
 const employeesRoutes = require('./modules/employees/routes');
 const attendanceRoutes = require('./modules/attendance/routes');
 const leaveRoutes = require('./modules/leave/routes');
+const payrollRoutes = require('./modules/payroll/routes');
 
 function createApp({ db = { checkDbConnection } } = {}) {
   const app = express();
@@ -53,6 +54,10 @@ function createApp({ db = { checkDbConnection } } = {}) {
   // Phase 07 — leave: /leaves/*, /holidays. Attachment downloads are NOT under the public
   // /uploads static mount above — see modules/leave/attachmentUpload.js.
   app.use(leaveRoutes);
+
+  // Phase 08 — payroll: /payroll/me, /payroll/:employeeId, /payroll, /payroll/:employeeId/preview.
+  // No cross-module reads — this module never touches attendance_records or leave_requests.
+  app.use(payrollRoutes);
 
   return app;
 }

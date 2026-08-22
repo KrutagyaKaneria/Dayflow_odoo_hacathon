@@ -76,7 +76,7 @@ afterAll(async () => {
   });
 });
 
-test('migrations apply cleanly on a fresh database and create all tables (Phase 01 + Phase 02 + Phase 04 + Phase 06 + Phase 07)', () => {
+test('migrations apply cleanly on a fresh database and create all tables (Phase 01 + Phase 02 + Phase 04 + Phase 06 + Phase 07 + Phase 08)', () => {
   runMigrateDeploy();
 
   const client = new Client({ connectionString: scratchUrl() });
@@ -98,6 +98,8 @@ test('migrations apply cleanly on a fresh database and create all tables (Phase 
           'organizations',
           'public_holidays',
           'refresh_tokens',
+          'salary_components',
+          'salary_structures',
           'users',
         ]);
       })

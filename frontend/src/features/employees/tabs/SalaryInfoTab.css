@@ -1,0 +1,160 @@
+.salary-info-tab__notice {
+  color: #6b7280;
+  text-align: center;
+  margin: 1.5rem 0;
+}
+
+.salary-info-tab__notice--error {
+  color: #b91c1c;
+}
+
+.salary-info-tab__error {
+  color: #b91c1c;
+  background: #fef2f2;
+  padding: 0.5rem 0.75rem;
+  border-radius: 4px;
+  font-size: 0.85rem;
+}
+
+.salary-info-tab__header {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr) auto;
+  gap: 1rem;
+  align-items: end;
+  margin-bottom: 1.5rem;
+}
+
+.salary-info-tab__field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.salary-info-tab__label {
+  font-size: 0.8rem;
+  color: #6b7280;
+}
+
+.salary-info-tab__value {
+  font-weight: 600;
+}
+
+.salary-info-tab__header label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  font-size: 0.8rem;
+  color: #6b7280;
+}
+
+.salary-info-tab__header input {
+  padding: 0.4rem;
+  border: 1px solid #d1d5db;
+  border-radius: 4px;
+}
+
+.salary-info-tab__header > button {
+  padding: 0.5rem 1rem;
+  border: none;
+  border-radius: 6px;
+  background: #111827;
+  color: #fff;
+  cursor: pointer;
+  height: fit-content;
+}
+
+.salary-section {
+  margin-bottom: 1.25rem;
+}
+
+.salary-section h3 {
+  font-size: 0.9rem;
+  margin-bottom: 0.4rem;
+}
+
+.salary-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.salary-table td {
+  padding: 0.4rem 0.5rem;
+  border-bottom: 1px solid #f3f4f6;
+  font-size: 0.9rem;
+}
+
+.salary-table__name {
+  font-weight: 500;
+}
+
+.salary-table__desc {
+  font-size: 0.75rem;
+  color: #9ca3af;
+}
+
+.salary-table__percent,
+.salary-table__amount {
+  text-align: right;
+  white-space: nowrap;
+}
+
+.salary-summary {
+  display: flex;
+  gap: 1.5rem;
+  border-top: 1px solid #e5e7eb;
+  padding-top: 0.75rem;
+  margin-top: 1rem;
+}
+
+.salary-summary div {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  font-size: 0.85rem;
+  color: #6b7280;
+}
+
+.salary-info-tab__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.5rem;
+  margin-top: 1rem;
+}
+
+.salary-info-tab__actions button {
+  padding: 0.5rem 1rem;
+  border-radius: 6px;
+  border: none;
+  cursor: pointer;
+}
+
+.salary-info-tab__actions button:last-child {
+  background: #111827;
+  color: #fff;
+}
+
+.salary-components-editor {
+  margin: 1rem 0;
+}
+
+.salary-components-editor__table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-bottom: 0.5rem;
+}
+
+.salary-components-editor__table th,
+.salary-components-editor__table td {
+  padding: 0.3rem;
+  font-size: 0.8rem;
+  border-bottom: 1px solid #f3f4f6;
+}
+
+.salary-components-editor__table input,
+.salary-components-editor__table select {
+  width: 100%;
+  padding: 0.25rem;
+  border: 1px solid #d1d5db;
+  border-radius: 4px;
+  font-size: 0.8rem;
+}

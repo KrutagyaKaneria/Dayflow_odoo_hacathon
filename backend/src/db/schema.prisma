@@ -1,10 +1,11 @@
-// Dayflow HRMS — schema through Phase 06 (foundational model, auth, RBAC, employee profiles,
-// attendance).
+// Dayflow HRMS — schema through Phase 08 (foundational model, auth, RBAC, employee profiles,
+// attendance, leave, payroll).
 //
 // Scope so far: organizations, users, employee_profiles (+ Phase 04's Resume/Private Info
 // fields), employee_bank_details, refresh_tokens, email_verification_tokens, attendance_records
-// (Phase 06). Leave, Salary, and Documents belong to later phases and are deliberately absent
-// here.
+// (Phase 06), leave_requests/leave_balances/public_holidays (Phase 07), salary_structures/
+// salary_components (Phase 08). Documents (D-13) belongs to a later phase and remains
+// deliberately absent.
 //
 // Open decisions that shaped this schema — do NOT resolve them silently:
 //   D-01: registration model (self-service per PDF §3.1.1 vs admin-provisioned
@@ -126,6 +127,7 @@ model EmployeeProfile {
   attendanceRecords AttendanceRecord[]
   leaveRequests     LeaveRequest[]
   leaveBalances     LeaveBalance[]
+  salaryStructure   SalaryStructure?
 
   // TODO(D-21): the exact employee-editable field set (PDF's narrow address/phone/picture vs. the
   // design's broader-looking editable icons) is resolved as a documented default in
@@ -305,4 +307,78 @@ model PublicHoliday {
 
   @@index([holidayDate])
   @@map("public_holidays")
+}
+
+/// Phase 08 — payroll. [DESIGN] shows only "Fixed wage"; a one-value enum means adding another
+/// wage type later is a value change, not a type change.
+enum SalaryWageType {
+  fixed
+}
+
+/// Phase 08. Distinguishes the three money directions D-34/D-36 depend on — not named by either
+/// source, [INFERENCE], but required for any coherent gross/net split.
+enum SalaryComponentKind {
+  earning
+  deduction_employee
+  contribution_employer
+}
+
+enum SalaryComputationType {
+  fixed_amount
+  percentage
+}
+
+/// Phase 08 — D-35. What a percentage component is a percentage OF. Per-component, not global —
+/// see payrollPolicy.js for why the design's own figures demonstrate a mixed base.
+enum SalaryPercentageBase {
+  wage
+  basic
+}
+
+/// Phase 08. One structure per employee (unique FK) — D-22's overwrite-in-place default, no
+/// versioning, no history table. workingDaysPerWeek/breakTimeHours are captured here but
+/// deliberately consumed by NOTHING this phase — payable-days is Phase 09 (D-12), and neither
+/// Phase 06's totalWorkingDays stub nor Phase 07's EXCLUDE_WEEKENDS_FROM_DAY_COUNT default are
+/// touched.
+model SalaryStructure {
+  id                  String         @id @default(uuid()) @db.Uuid
+  employeeProfileId   String         @unique @map("employee_profile_id") @db.Uuid
+  wageType            SalaryWageType @default(fixed) @map("wage_type")
+  monthlyWage         Decimal        @map("monthly_wage") @db.Decimal(12, 2)
+  yearlyWage          Decimal        @map("yearly_wage") @db.Decimal(12, 2)
+  workingDaysPerWeek  Decimal?       @map("working_days_per_week") @db.Decimal(3, 1)
+  breakTimeHours      Decimal?       @map("break_time_hours") @db.Decimal(4, 2)
+  createdAt           DateTime       @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt           DateTime       @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  employeeProfile EmployeeProfile   @relation(fields: [employeeProfileId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  components      SalaryComponent[]
+
+  @@map("salary_structures")
+}
+
+/// Phase 08. PF (employee/employer) and Professional Tax are ROWS here (componentKind
+/// distinguishes them), not bespoke columns — see routes.js. Computed rupee amounts are NEVER
+/// stored — calculateSalary.js derives them at read time from `value` + computationType +
+/// percentageBase, matching the derived-not-stored precedent from Phase 06/07.
+model SalaryComponent {
+  id                String                 @id @default(uuid()) @db.Uuid
+  salaryStructureId String                 @map("salary_structure_id") @db.Uuid
+  name              String                 @db.VarChar(255)
+  componentKind     SalaryComponentKind    @map("component_kind")
+  computationType   SalaryComputationType  @map("computation_type")
+  percentageBase    SalaryPercentageBase?  @map("percentage_base")
+  // Identifies which SINGLE component is "Basic" — see the migration comment. At most one true
+  // per structure, enforced by a partial unique index.
+  isBasic           Boolean                @default(false) @map("is_basic")
+  value             Decimal                @db.Decimal(8, 4)
+  description       String?                @db.Text
+  displayOrder      Int                    @map("display_order")
+  createdAt         DateTime               @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt         DateTime               @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  salaryStructure SalaryStructure @relation(fields: [salaryStructureId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+
+  @@index([salaryStructureId])
+  @@map("salary_components")
 }

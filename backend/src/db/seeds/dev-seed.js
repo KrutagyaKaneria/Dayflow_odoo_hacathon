@@ -15,6 +15,16 @@
  * live, at read time, for any employee (including ones provisioned after this script last ran)
  * with no leave_balances row yet. Re-running this script is safe (idempotent) either way.
  *
+ * Phase 08: backfills the design's worked-example salary structure (wage 50000, the 8-component
+ * set that reproduces the design's figures exactly — see calculateSalary.test.js) for whatever
+ * employee_profiles already exist AND DON'T ALREADY HAVE a structure. Unlike leave balances,
+ * this is NOT skipped-and-refallen-back-to-live for a missing row — payroll has no equivalent
+ * "default allocation" concept, so an employee genuinely has no salary structure until an Admin
+ * (or this seed) creates one; GET /payroll/me correctly 404s NO_SALARY_STRUCTURE until then. This
+ * seed step only ever CREATES for an employee with no structure yet — it never overwrites one an
+ * Admin has already edited via PATCH /payroll/:employeeId, respecting the D-22 overwrite-only-
+ * via-explicit-PATCH default.
+ *
  * Usage: npm run db:seed   (targets DATABASE_URL)
  */
 const { prisma } = require('../../config/db');
@@ -72,21 +82,59 @@ async function backfillLeaveBalances() {
   }
 }
 
+// [DESIGN] The worked-example component set. Basic -> percentage-of-wage (isBasic: true);
+// everything else -> percentage-of-basic, per D-35 — see payrollPolicy.js and
+// calculateSalary.test.js for the full reasoning and the reproduced figures.
+const DESIGN_SALARY_COMPONENTS = [
+  { name: 'Basic Salary', componentKind: 'earning', computationType: 'percentage', percentageBase: 'wage', isBasic: true, value: 50, description: '50% of Wage', displayOrder: 1 },
+  { name: 'House Rent Allowance', componentKind: 'earning', computationType: 'percentage', percentageBase: 'basic', isBasic: false, value: 50, description: '50% of Basic', displayOrder: 2 },
+  { name: 'Standard Allowance', componentKind: 'earning', computationType: 'percentage', percentageBase: 'basic', isBasic: false, value: 16.67, description: '16.67% of Basic', displayOrder: 3 },
+  { name: 'Performance Bonus', componentKind: 'earning', computationType: 'percentage', percentageBase: 'basic', isBasic: false, value: 8.33, description: '8.33% of Basic', displayOrder: 4 },
+  // Value not dictated by either source's worked example (only named as a component to model) —
+  // chosen to keep the seeded fixture safely under the wage ceiling (D-34).
+  { name: 'Leave Travel Allowance', componentKind: 'earning', computationType: 'fixed_amount', percentageBase: null, isBasic: false, value: 1250, description: 'Fixed allowance', displayOrder: 5 },
+  { name: 'PF (Employee)', componentKind: 'deduction_employee', computationType: 'percentage', percentageBase: 'basic', isBasic: false, value: 12, description: '12% of Basic, deducted from pay', displayOrder: 6 },
+  { name: 'PF (Employer)', componentKind: 'contribution_employer', computationType: 'percentage', percentageBase: 'basic', isBasic: false, value: 12, description: '12% of Basic, employer cost only', displayOrder: 7 },
+  { name: 'Professional Tax', componentKind: 'deduction_employee', computationType: 'fixed_amount', percentageBase: null, isBasic: false, value: 200, description: 'Deducted from Gross salary', displayOrder: 8 },
+];
+
+async function backfillSalaryStructures() {
+  const profiles = await prisma.employeeProfile.findMany({
+    select: { id: true, salaryStructure: { select: { id: true } } },
+  });
+  for (const profile of profiles) {
+    if (profile.salaryStructure) continue; // never overwrite an existing (possibly Admin-edited) structure
+    await prisma.salaryStructure.create({
+      data: {
+        employeeProfileId: profile.id,
+        wageType: 'fixed',
+        monthlyWage: 50000,
+        yearlyWage: 600000,
+        workingDaysPerWeek: 5, // created here, consumed by nothing this phase — see payrollPolicy.js
+        breakTimeHours: 1,
+        components: { create: DESIGN_SALARY_COMPONENTS },
+      },
+    });
+  }
+}
+
 async function main() {
   await seedOrganization();
   await seedPublicHolidays();
   await backfillLeaveBalances();
+  await backfillSalaryStructures();
 
-  const [orgs, users, profiles, holidays, balances] = await Promise.all([
+  const [orgs, users, profiles, holidays, balances, structures] = await Promise.all([
     prisma.organization.count(),
     prisma.user.count(),
     prisma.employeeProfile.count(),
     prisma.publicHoliday.count(),
     prisma.leaveBalance.count(),
+    prisma.salaryStructure.count(),
   ]);
 
   console.log(
-    `[dayflow] seed complete — organizations: ${orgs}, users: ${users}, employee_profiles: ${profiles}, public_holidays: ${holidays}, leave_balances: ${balances}`
+    `[dayflow] seed complete — organizations: ${orgs}, users: ${users}, employee_profiles: ${profiles}, public_holidays: ${holidays}, leave_balances: ${balances}, salary_structures: ${structures}`
   );
 }
 
