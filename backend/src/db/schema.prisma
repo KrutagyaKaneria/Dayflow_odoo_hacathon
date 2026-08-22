@@ -214,7 +214,10 @@ model AttendanceRecord {
   id                String            @id @default(uuid()) @db.Uuid
   employeeProfileId String            @map("employee_profile_id") @db.Uuid
   attendanceDate    DateTime          @map("attendance_date") @db.Date
-  checkInAt         DateTime          @map("check_in_at") @db.Timestamptz(3)
+  // Nullable since Phase 09: a LEAVE-status row written by the approval sync has no observed
+  // check-in at all — see the migration comment and modules/integration/
+  // syncLeaveApprovalToAttendance.js.
+  checkInAt         DateTime?         @map("check_in_at") @db.Timestamptz(3)
   checkOutAt        DateTime?         @map("check_out_at") @db.Timestamptz(3)
   workHours         Decimal?          @map("work_hours") @db.Decimal(5, 2)
   extraHours        Decimal?          @map("extra_hours") @db.Decimal(5, 2)

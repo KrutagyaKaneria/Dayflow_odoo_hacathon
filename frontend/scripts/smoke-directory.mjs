@@ -1,8 +1,9 @@
 /**
  * Employees directory smoke test — Phase 05 (search debounce call-count, NEW button role
- * gating). Same Vite-SSR-loader technique as the other smoke-*.mjs scripts; uses
- * react-test-renderer + act (not renderToStaticMarkup) because this needs real effects and
- * interactive state updates to run — debounce timers and a fetch-on-settle effect.
+ * gating) + Phase 09 (D-40 status icon rendering). Same Vite-SSR-loader technique as the other
+ * smoke-*.mjs scripts; uses react-test-renderer + act (not renderToStaticMarkup) because this
+ * needs real effects and interactive state updates to run — debounce timers and a
+ * fetch-on-settle effect.
  */
 import { createServer } from 'vite';
 import React from 'react';
@@ -103,6 +104,48 @@ try {
       });
     }
   }
+  // 3. Phase 09, D-40: the three status icons render distinctly based on employee.statusIcon.
+  // This component only renders whatever the server already decided (see integrationPolicy.js)
+  // — it does not re-derive precedence itself, so this just checks the three symbols map
+  // correctly, not the precedence logic (that's covered server-side in
+  // backend/tests/unit/derive-employee-status.test.js).
+  const iconFetch = (statusIcon) => async () => ({
+    ok: true,
+    json: async () => ({
+      employees: [{ id: 'e1', name: 'Test Employee', avatarUrl: null, statusIcon }],
+      page: 1,
+      pageSize: 20,
+      total: 1,
+    }),
+  });
+
+  for (const [statusIcon, expectedSymbol] of [
+    ['present', '🟢'],
+    ['on_leave', '✈️'],
+    ['absent', '🟡'],
+  ]) {
+    globalThis.fetch = iconFetch(statusIcon);
+    let iconRenderer;
+    try {
+      await act(async () => {
+        iconRenderer = create(withAuth('employee', React.createElement(DirectoryPage)));
+      });
+      await act(async () => {
+        await new Promise((resolve) => setTimeout(resolve, 50));
+      });
+      const markup = JSON.stringify(iconRenderer.toJSON());
+      if (!markup.includes(expectedSymbol)) {
+        fail(`statusIcon "${statusIcon}" should render ${expectedSymbol}, markup was: ${markup}`);
+      }
+    } finally {
+      globalThis.fetch = originalFetch;
+      if (iconRenderer) {
+        await act(async () => {
+          iconRenderer.unmount();
+        });
+      }
+    }
+  }
 } finally {
   await server.close();
 }
@@ -110,4 +153,4 @@ try {
 if (process.exitCode) {
   process.exit(process.exitCode);
 }
-console.log('[smoke-directory] PASS: search debounce fires once per settle, NEW button is role-gated');
+console.log('[smoke-directory] PASS: search debounce fires once per settle, NEW button is role-gated, status icons render correctly');

@@ -163,8 +163,11 @@ router.patch(
       return sendError(res, 404, 'NOT_FOUND', 'Leave request not found.');
     }
     const { adminComment } = req.body || {};
-    const record = await service.decide(req.user.id, req.params.id, 'approve', adminComment);
-    return res.status(200).json({ record: toRecordResponse(record) });
+    // Phase 09: decide() now also runs the attendance sync inline (see leave/service.js and
+    // modules/integration/syncLeaveApprovalToAttendance.js) and returns which dates it could
+    // not sync because of an existing check-in (D-39) — surfaced here, never swallowed.
+    const { record, attendanceSyncSkippedDates } = await service.decide(req.user.id, req.params.id, 'approve', adminComment);
+    return res.status(200).json({ record: toRecordResponse(record), attendanceSyncSkippedDates });
   })
 );
 
@@ -177,7 +180,8 @@ router.patch(
       return sendError(res, 404, 'NOT_FOUND', 'Leave request not found.');
     }
     const { adminComment } = req.body || {};
-    const record = await service.decide(req.user.id, req.params.id, 'reject', adminComment);
+    // Rejection never syncs attendance — a PENDING request never wrote any rows to reverse.
+    const { record } = await service.decide(req.user.id, req.params.id, 'reject', adminComment);
     return res.status(200).json({ record: toRecordResponse(record) });
   })
 );

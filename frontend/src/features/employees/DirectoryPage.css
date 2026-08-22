@@ -78,11 +78,6 @@
   position: absolute;
   top: 0.75rem;
   right: 0.75rem;
-  width: 10px;
-  height: 10px;
-  border-radius: 50%;
-}
-
-.employee-card__status--unknown {
-  background: #9ca3af;
+  font-size: 0.9rem;
+  line-height: 1;
 }

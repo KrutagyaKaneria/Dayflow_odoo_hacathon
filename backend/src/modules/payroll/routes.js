@@ -3,6 +3,7 @@ const { sendError } = require('../../shared/response');
 const { requireAuth, requireRole } = require('../../shared/auth');
 const { PayrollError } = require('./errors');
 const service = require('./service');
+const { computePayableDaysForPeriod } = require('../integration/payableDays');
 
 // [RECOMMENDATION resolving D-03] Interpretation adopted: an employee CAN VIEW their own salary
 // structure but CANNOT EDIT it; only Admin/HR can view another employee's salary, and only
@@ -14,8 +15,8 @@ const service = require('./service');
 //
 // On requireSelfOrRole (Phase 03): not used here either, same as Phase 06/07 — /me is
 // self-scoped by construction and /:employeeId is admin-only under D-03's resolution, not
-// ownership-checked. Three consecutive phases (06, 07, 08) without a consumer — flagged in the
-// phase report for a reviewer's attention, not silently accumulated.
+// ownership-checked. Four consecutive phases (06, 07, 08, 09) without a consumer — flagged in
+// the phase report for a reviewer's attention, not silently accumulated.
 
 const router = express.Router();
 
@@ -100,6 +101,24 @@ router.post(
   handle(async (req, res) => {
     const preview = service.preview(parsePayload(req.body));
     return res.status(200).json({ structure: preview });
+  })
+);
+
+// Phase 09, Part C. Admin-only, matching D-03's resolution for cross-employee payroll data — an
+// Employee gets 403 here even with their own id, same as GET /payroll/:employeeId (they have no
+// equivalent /payroll/me/payable-days route this phase, since payable days was never in scope
+// for an employee's own view). No monetary amount is computed or returned — see
+// modules/integration/payableDays.js's header for the full formula, the four upstream
+// ambiguities it inherits, and why the payslip line stops here.
+router.get(
+  '/payroll/:employeeId/payable-days',
+  requireAuth,
+  requireRole('admin_hr'),
+  handle(async (req, res) => {
+    const employeeProfileId = await service.getEmployeeProfileIdByUserId(req.params.employeeId);
+    const period = typeof req.query.period === 'string' ? req.query.period : undefined;
+    const result = await computePayableDaysForPeriod(employeeProfileId, period);
+    return res.status(200).json(result);
   })
 );
 

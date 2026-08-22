@@ -84,6 +84,31 @@ export function DirectoryPage() {
   );
 }
 
+// [DESIGN] legend: 🟢 green = present in office, ✈️ airplane = on leave, 🟡 yellow = absent.
+// The precedence between these when an employee matches more than one condition (e.g. checked
+// in AND has approved leave for today) is decided server-side — see backend/src/modules/
+// integration/integrationPolicy.js's D-40 note. This component only renders whatever
+// employee.statusIcon says; it does not re-derive or second-guess it.
+const STATUS_ICON_CONFIG = {
+  present: { symbol: '🟢', label: 'Present' },
+  on_leave: { symbol: '✈️', label: 'On leave' },
+  absent: { symbol: '🟡', label: 'Absent' },
+};
+
+function StatusIcon({ statusIcon }) {
+  const config = STATUS_ICON_CONFIG[statusIcon];
+  if (!config) return null;
+  return (
+    <span
+      className={`employee-card__status employee-card__status--${statusIcon}`}
+      title={config.label}
+      aria-label={config.label}
+    >
+      {config.symbol}
+    </span>
+  );
+}
+
 function EmployeeCard({ employee, isSelf }) {
   return (
     // TODO(D-14): this will currently 403 for an Employee clicking a coworker's card, until D-14
@@ -99,10 +124,7 @@ function EmployeeCard({ employee, isSelf }) {
         <div className="employee-card__avatar employee-card__avatar--placeholder">{initials(employee.name)}</div>
       )}
       <span className="employee-card__name">{employee.name}</span>
-      <span
-        className={`employee-card__status employee-card__status--${employee.statusIcon}`}
-        title="Status unknown — Attendance/Leave not built yet (Phase 06/07/09)"
-      />
+      <StatusIcon statusIcon={employee.statusIcon} />
     </Link>
   );
 }

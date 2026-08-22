@@ -38,7 +38,10 @@ describe('GET /employees', () => {
     const entry = res.body.employees.find((e) => e.id === caller.id);
     expect(entry).toBeDefined();
     expect(Object.keys(entry).sort()).toEqual(['avatarUrl', 'id', 'name', 'statusIcon'].sort());
-    expect(entry.statusIcon).toBe('unknown');
+    // Phase 09 replaced the Phase 05 'unknown' stub with a real D-40 derivation — a caller with
+    // no check-in and no approved leave today is 'absent'. See 15-integration.test.js for the
+    // full precedence-matrix coverage (present / on_leave / absent).
+    expect(entry.statusIcon).toBe('absent');
   });
 
   test('an authenticated Admin gets 200 with the SAME minimal projection — not more', async () => {

@@ -1,6 +1,7 @@
 const { prisma } = require('../../config/db');
 const { AttendanceError } = require('./errors');
 const { deriveAttendanceDate, computeHours, deriveStatus } = require('./attendancePolicy');
+const { computePayableDaysForPeriod } = require('../integration/payableDays');
 
 // Both check-in and check-out act only on the calling user's own profile (see routes.js) — the
 // employee is never accepted from the request body/query. This removes impersonation as a
@@ -54,7 +55,12 @@ async function checkOut(userId) {
       employeeProfileId_attendanceDate: { employeeProfileId, attendanceDate: toDateOnly(attendanceDate) },
     },
   });
-  if (!existing || existing.checkOutAt) {
+  // Phase 09: check_in_at is nullable now (a LEAVE row synced from an approved leave has no
+  // observed check-in — see modules/integration/syncLeaveApprovalToAttendance.js). A record
+  // that exists but was never checked into is not an open session to close out, so it must be
+  // treated the same as "no record at all" here — otherwise computeHours() below would be
+  // called with a null checkInAt and produce garbage (NaN) work/extra hours.
+  if (!existing || !existing.checkInAt || existing.checkOutAt) {
     throw new AttendanceError(409, 'NOT_CHECKED_IN', 'No open check-in for today.');
   }
 
@@ -77,8 +83,11 @@ async function getToday(userId) {
     },
   });
 
+  // Phase 09: checkedIn must reflect an actual observed check-in, not merely "a row exists" —
+  // a LEAVE row synced from approved leave (checkInAt null) is not a check-in, and must not
+  // drive the nav status dot green or the widget into its "Since HH:MM" state.
   return {
-    checkedIn: Boolean(record),
+    checkedIn: Boolean(record && record.checkInAt),
     checkInAt: record ? record.checkInAt : null,
     checkedOut: Boolean(record && record.checkOutAt),
   };
@@ -109,18 +118,21 @@ async function getMyMonth(userId, monthParam) {
   });
 
   const daysPresent = records.filter((r) => r.status === 'present' || r.status === 'half_day').length;
+  // Phase 09, Part B: leavesCount is now real — the count of LEAVE-status attendance records
+  // this month, i.e. rows the approval sync wrote (modules/integration/
+  // syncLeaveApprovalToAttendance.js). No separate leave-table query needed; `records` already
+  // covers the month.
+  const leavesCount = records.filter((r) => r.status === 'leave').length;
+
+  // Phase 09, Part C: totalWorkingDays now uses the SAME shared helper as the payable-days
+  // endpoint (modules/integration/payableDays.js) — one implementation, not two. Still honestly
+  // null (not a guess) if the employee has no salary structure yet.
+  const { totalWorkingDays } = await computePayableDaysForPeriod(employeeProfileId, month);
 
   return {
     month,
     records,
-    // TODO(D-27 / Phase 07 / Phase 08): only daysPresent is honestly computable this phase
-    // (count of PRESENT + HALF_DAY records in the month). leavesCount requires Leave data
-    // (Phase 07) — return 0 with this marker. totalWorkingDays requires a working-day calendar
-    // (public holidays: Phase 07 + D-11; working-days-per-week: Phase 08) — return null with
-    // this marker. Do NOT approximate either with a hardcoded 22-day month or a weekday count —
-    // a plausible-looking wrong number is worse than an obvious gap here, since Phase 09's
-    // payable-days work may read these figures.
-    summary: { daysPresent, leavesCount: 0, totalWorkingDays: null },
+    summary: { daysPresent, leavesCount, totalWorkingDays },
   };
 }
 

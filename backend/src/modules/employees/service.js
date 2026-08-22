@@ -1,12 +1,15 @@
 const { prisma } = require('../../config/db');
 const { EmployeeError } = require('./errors');
+const { batchDeriveStatusIcons } = require('../integration/deriveEmployeeStatus');
 
 // [RECOMMENDATION] Neither source document specifies a page size for the directory listing.
 const DEFAULT_PAGE_SIZE = 20;
 
 // Phase 05 — GET /employees. Deliberately minimal, safe-to-expose-broadly projection: see the
 // [RECOMMENDATION pending D-14] note in routes.js. Returns { id, name, avatarUrl, statusIcon }
-// per employee, never Private Info / Bank Details / anything Phase 04 guards.
+// per employee, never Private Info / Bank Details / anything Phase 04 guards. The projection
+// SHAPE is unchanged from Phase 05 — only statusIcon's value is now real (Phase 09, D-40 — see
+// modules/integration/deriveEmployeeStatus.js).
 async function listEmployees({ search, page = 1 } = {}) {
   const pageNum = Number.isInteger(page) && page > 0 ? page : 1;
   const where = search ? { name: { contains: search, mode: 'insensitive' } } : {};
@@ -14,7 +17,7 @@ async function listEmployees({ search, page = 1 } = {}) {
   const [rows, total] = await Promise.all([
     prisma.employeeProfile.findMany({
       where,
-      select: { userId: true, name: true, avatarUrl: true },
+      select: { id: true, userId: true, name: true, avatarUrl: true },
       orderBy: { name: 'asc' },
       skip: (pageNum - 1) * DEFAULT_PAGE_SIZE,
       take: DEFAULT_PAGE_SIZE,
@@ -22,17 +25,16 @@ async function listEmployees({ search, page = 1 } = {}) {
     prisma.employeeProfile.count({ where }),
   ]);
 
+  // Batched — two queries total for the whole page, not one per employee. See
+  // deriveEmployeeStatus.js's batchDeriveStatusIcons docstring.
+  const statusIcons = await batchDeriveStatusIcons(rows.map((row) => row.id));
+
   return {
     employees: rows.map((row) => ({
       id: row.userId,
       name: row.name,
       avatarUrl: row.avatarUrl,
-      // [STUB — Phase 09 replaces this] statusIcon is hardcoded to 'unknown' (render as a
-      // neutral gray dot) for every employee this phase, since no Attendance or Leave data
-      // exists yet to derive it from. Do NOT implement any real present/absent/leave derivation
-      // here — that belongs to Phase 09's Cross-Module Integration, which explicitly owns this
-      // calculation.
-      statusIcon: 'unknown',
+      statusIcon: statusIcons.get(row.id) ?? 'absent',
     })),
     page: pageNum,
     pageSize: DEFAULT_PAGE_SIZE,

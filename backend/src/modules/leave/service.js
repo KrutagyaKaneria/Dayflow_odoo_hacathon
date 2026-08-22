@@ -1,6 +1,7 @@
 const { prisma } = require('../../config/db');
 const { LeaveError } = require('./errors');
 const { countDays, rangesOverlap, deriveBalance, resolveAllocatedDays, toDateOnlyString } = require('./leavePolicy');
+const { syncApprovedLeaveToAttendance } = require('../integration/syncLeaveApprovalToAttendance');
 
 const VALID_LEAVE_TYPES = ['paid_time_off', 'sick_leave', 'unpaid_leave'];
 const ACTIVE_STATUSES = ['pending', 'approved'];
@@ -179,22 +180,41 @@ async function listAll({ status, search }) {
 // Conditional update (WHERE status = 'pending'), not read-then-write — the affected-row count is
 // the concurrency guarantee: two simultaneous decisions on the same request produce exactly one
 // transition, since only one UPDATE can match the WHERE clause before the row's status changes.
+// This still holds inside the $transaction below — Prisma interactive transactions preserve
+// normal DB isolation for the updateMany.
+//
+// Phase 09: on approval, this now also runs the attendance sync (see
+// modules/integration/syncLeaveApprovalToAttendance.js) INSIDE the same transaction —
+// [PDF §3.5.2] requires approval to "reflect immediately," and atomicity means a sync failure
+// rolls back the approval rather than leaving the two modules disagreeing. Rejection never syncs
+// — a PENDING request never wrote attendance rows, so there is nothing to reverse.
 async function decide(adminUserId, leaveId, action, adminComment) {
   const status = action === 'approve' ? 'approved' : 'rejected';
-  const result = await prisma.leaveRequest.updateMany({
-    where: { id: leaveId, status: 'pending' },
-    data: { status, adminComment: adminComment || null, decidedByUserId: adminUserId, decidedAt: new Date() },
-  });
 
-  if (result.count === 0) {
-    const existing = await prisma.leaveRequest.findUnique({ where: { id: leaveId } });
-    if (!existing) {
-      throw new LeaveError(404, 'NOT_FOUND', 'Leave request not found.');
+  return prisma.$transaction(async (tx) => {
+    const result = await tx.leaveRequest.updateMany({
+      where: { id: leaveId, status: 'pending' },
+      data: { status, adminComment: adminComment || null, decidedByUserId: adminUserId, decidedAt: new Date() },
+    });
+
+    if (result.count === 0) {
+      const existing = await tx.leaveRequest.findUnique({ where: { id: leaveId } });
+      if (!existing) {
+        throw new LeaveError(404, 'NOT_FOUND', 'Leave request not found.');
+      }
+      throw new LeaveError(409, 'LEAVE_ALREADY_DECIDED', 'This leave request has already been decided.');
     }
-    throw new LeaveError(409, 'LEAVE_ALREADY_DECIDED', 'This leave request has already been decided.');
-  }
 
-  return prisma.leaveRequest.findUnique({ where: { id: leaveId } });
+    const record = await tx.leaveRequest.findUnique({ where: { id: leaveId } });
+
+    let attendanceSyncSkippedDates = [];
+    if (action === 'approve') {
+      const syncResult = await syncApprovedLeaveToAttendance(tx, record);
+      attendanceSyncSkippedDates = syncResult.skippedDates;
+    }
+
+    return { record, attendanceSyncSkippedDates };
+  });
 }
 
 // D-09: read-only, every employee's per-type figures. No edit affordance, no adjustment endpoint.

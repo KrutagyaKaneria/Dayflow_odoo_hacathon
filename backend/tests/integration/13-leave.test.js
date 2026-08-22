@@ -463,10 +463,17 @@ describe('GET /holidays', () => {
   });
 });
 
-describe('Regression: nothing in this phase writes to attendance_records', () => {
-  test('a full submit/approve/reject cycle leaves attendance_records untouched', async () => {
+// Superseded by Phase 09, Part B: [PDF §3.5.2] requires approval to "reflect immediately in
+// employee records", and Phase 09 implements exactly that (see modules/integration/
+// syncLeaveApprovalToAttendance.js and 15-integration.test.js for the full sync coverage). This
+// test's ORIGINAL claim — that nothing in the leave module writes to attendance_records — was
+// true and correct for Phase 07 in isolation, and is intentionally no longer true now that
+// Phase 09 wires the two modules together. Kept here, updated, as a regression guard on the
+// asymmetry Phase 09 introduced: approval syncs, rejection never does.
+describe('Phase 09: only approval writes to attendance_records — rejection never does', () => {
+  test('a full submit/approve/reject cycle writes attendance rows only for the approved request', async () => {
     const { user: admin, password: adminPassword } = await createEmployeeWithProfile({ role: 'admin_hr' });
-    const { user: emp, password: empPassword } = await createEmployeeWithProfile();
+    const { user: emp, profile, password: empPassword } = await createEmployeeWithProfile();
     const adminToken = await signIn(admin.email, adminPassword);
     const empToken = await signIn(emp.email, empPassword);
 
@@ -475,7 +482,12 @@ describe('Regression: nothing in this phase writes to attendance_records', () =>
     const req2 = await submitLeave(empToken, { startDate: '2025-09-01', endDate: '2025-09-02' });
     await request(app).patch(`/leaves/${req2.body.record.id}/reject`).set('Authorization', `Bearer ${adminToken}`);
 
-    const attendanceRows = await prisma.attendanceRecord.count();
-    expect(attendanceRows).toBe(0);
+    const attendanceRows = await prisma.attendanceRecord.findMany({ where: { employeeProfileId: profile.id } });
+    // Exactly 2 rows — one per day of the APPROVED (Aug) request. The REJECTED (Sep) request
+    // contributed zero, since rejection never syncs (a PENDING request never wrote rows to
+    // reverse in the first place).
+    expect(attendanceRows).toHaveLength(2);
+    expect(attendanceRows.every((r) => r.status === 'leave')).toBe(true);
+    expect(attendanceRows.every((r) => r.attendanceDate.toISOString().slice(0, 7) === '2025-08')).toBe(true);
   });
 });

@@ -54,16 +54,17 @@ export function EmployeeAttendancePage() {
           <span className="attendance-chip__label">Days Present</span>
           <span className="attendance-chip__value">{summary.daysPresent}</span>
         </div>
-        {/* TODO(D-27 / Phase 07 / Phase 08): leavesCount and totalWorkingDays are honest stubs
-            server-side (0 and null respectively) — rendered as "—" here rather than as 0,
-            since a stubbed 0 would misrepresent a genuinely unknown value as a confirmed count. */}
+        {/* Phase 09: both figures are now real (see backend attendance/service.js) — leavesCount
+            from the Leave→Attendance sync, totalWorkingDays from the shared payable-days
+            helper. totalWorkingDays still honestly renders as "—" when null (no salary
+            structure configured yet), never approximated. */}
         <div className="attendance-chip">
           <span className="attendance-chip__label">Leaves</span>
-          <span className="attendance-chip__value">—</span>
+          <span className="attendance-chip__value">{summary.leavesCount}</span>
         </div>
         <div className="attendance-chip">
           <span className="attendance-chip__label">Total Working Days</span>
-          <span className="attendance-chip__value">—</span>
+          <span className="attendance-chip__value">{summary.totalWorkingDays ?? '—'}</span>
         </div>
       </div>
 
