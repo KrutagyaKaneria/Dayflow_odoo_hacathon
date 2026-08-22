@@ -47,6 +47,7 @@ model Organization {
 
   users            User[]
   employeeProfiles EmployeeProfile[]
+  publicHolidays   PublicHoliday[]
 
   @@map("organizations")
 }
@@ -70,6 +71,7 @@ model User {
   employeeProfile  EmployeeProfile?
   refreshTokens           RefreshToken[]
   emailVerificationTokens EmailVerificationToken[]
+  decidedLeaveRequests    LeaveRequest[]           @relation("LeaveDecidedBy")
 
   // TODO(D-01): registration model (self-service per PDF §3.1.1 vs. admin-provisioned per design Note) is unresolved.
   // This schema supports either outcome:
@@ -122,6 +124,8 @@ model EmployeeProfile {
   reports      EmployeeProfile[]    @relation("EmployeeManager")
   bankDetails  EmployeeBankDetails?
   attendanceRecords AttendanceRecord[]
+  leaveRequests     LeaveRequest[]
+  leaveBalances     LeaveBalance[]
 
   // TODO(D-21): the exact employee-editable field set (PDF's narrow address/phone/picture vs. the
   // design's broader-looking editable icons) is resolved as a documented default in
@@ -222,4 +226,83 @@ model AttendanceRecord {
   @@unique([employeeProfileId, attendanceDate])
   @@index([attendanceDate])
   @@map("attendance_records")
+}
+
+/// Phase 07 — leave. [PDF] and [DESIGN] agree on these three types exactly.
+enum LeaveType {
+  paid_time_off
+  sick_leave
+  unpaid_leave
+}
+
+/// Phase 07 — leave. Only the three PDF §3.5.1 values — see TODO(D-33) on LeaveRequest: no
+/// CANCELLED state exists, and neither source describes one.
+enum LeaveStatus {
+  pending
+  approved
+  rejected
+}
+
+/// Phase 07. Attaches to EmployeeProfile, matching Phase 06's AttendanceRecord precedent.
+/// ON DELETE CASCADE for the same reason as AttendanceRecord — a leave request is meaningless
+/// without its employee. days_used/days_pending are NOT columns anywhere in this schema — see
+/// leavePolicy.js; they are derived by aggregating rows of this table at read time.
+model LeaveRequest {
+  id                String      @id @default(uuid()) @db.Uuid
+  employeeProfileId String      @map("employee_profile_id") @db.Uuid
+  leaveType         LeaveType   @map("leave_type")
+  startDate         DateTime    @map("start_date") @db.Date
+  endDate           DateTime    @map("end_date") @db.Date
+  daysCount         Decimal     @map("days_count") @db.Decimal(6, 2)
+  status            LeaveStatus @default(pending)
+  remarks           String?     @db.Text
+  attachmentUrl     String?     @map("attachment_url") @db.VarChar(255)
+  adminComment      String?     @map("admin_comment") @db.Text
+  decidedByUserId   String?     @map("decided_by_user_id") @db.Uuid
+  decidedAt         DateTime?   @map("decided_at") @db.Timestamptz(3)
+  createdAt         DateTime    @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt         DateTime    @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  employeeProfile EmployeeProfile @relation(fields: [employeeProfileId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  decidedByUser   User?           @relation("LeaveDecidedBy", fields: [decidedByUserId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+
+  // TODO(D-33): employee cancellation/edit of a PENDING request is not built — no CANCELLED
+  // state exists. Adding one later is an enum migration, not a config change.
+  @@index([employeeProfileId, startDate])
+  @@index([status])
+  @@map("leave_requests")
+}
+
+/// Phase 07. One row per employee per leave type; unpaid_leave deliberately has no row (it is
+/// unbounded by definition — see leavePolicy.js seeding notes). Read-only from the Admin
+/// Allocation tab this phase (D-09).
+model LeaveBalance {
+  id                String    @id @default(uuid()) @db.Uuid
+  employeeProfileId String    @map("employee_profile_id") @db.Uuid
+  leaveType         LeaveType @map("leave_type")
+  daysAllocated     Decimal   @map("days_allocated") @db.Decimal(5, 2)
+  createdAt         DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt         DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  employeeProfile EmployeeProfile @relation(fields: [employeeProfileId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+
+  @@unique([employeeProfileId, leaveType])
+  @@map("leave_balances")
+}
+
+/// Phase 07. [RECOMMENDATION pending D-11] organizationId nullable: NULL = global/default
+/// holiday set. Seeded (not migrated) with the design's nine India-specific 2026 dates — see
+/// src/db/seeds/dev-seed.js.
+model PublicHoliday {
+  id             String        @id @default(uuid()) @db.Uuid
+  organizationId String?       @map("organization_id") @db.Uuid
+  holidayDate    DateTime      @map("holiday_date") @db.Date
+  name           String        @db.VarChar(255)
+  createdAt      DateTime      @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt      DateTime      @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  organization Organization? @relation(fields: [organizationId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+
+  @@index([holidayDate])
+  @@map("public_holidays")
 }

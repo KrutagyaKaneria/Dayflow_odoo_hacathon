@@ -6,6 +6,7 @@ const { sendError } = require('./shared/response');
 const authRoutes = require('./modules/auth/routes');
 const employeesRoutes = require('./modules/employees/routes');
 const attendanceRoutes = require('./modules/attendance/routes');
+const leaveRoutes = require('./modules/leave/routes');
 
 function createApp({ db = { checkDbConnection } } = {}) {
   const app = express();
@@ -48,6 +49,10 @@ function createApp({ db = { checkDbConnection } } = {}) {
   // Phase 06 — attendance: /attendance/check-in, /attendance/check-out, /attendance/today,
   // /attendance/me, /attendance (Admin day-scoped list).
   app.use(attendanceRoutes);
+
+  // Phase 07 — leave: /leaves/*, /holidays. Attachment downloads are NOT under the public
+  // /uploads static mount above — see modules/leave/attachmentUpload.js.
+  app.use(leaveRoutes);
 
   return app;
 }

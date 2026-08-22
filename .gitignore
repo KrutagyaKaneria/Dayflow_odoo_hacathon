@@ -23,3 +23,7 @@ backend/src/generated/
 
 # Phase 04 — locally-stored avatar uploads (dev/test only, not committed)
 backend/uploads/
+
+# Phase 07 — locally-stored leave attachments (dev/test only, not committed; deliberately NOT
+# under backend/uploads/ — see modules/leave/attachmentUpload.js)
+backend/leave-attachments/

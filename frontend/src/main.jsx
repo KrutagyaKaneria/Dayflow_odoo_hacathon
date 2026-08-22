@@ -3,11 +3,11 @@ import ReactDOM from 'react-dom/client';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { AuthProvider } from './app/auth';
 import { AppShell } from './app/nav/AppShell.jsx';
-import { PlaceholderPage } from './app/nav/PlaceholderPage.jsx';
 import { SignInPage } from './features/auth/SignInPage.jsx';
 import { DirectoryPage } from './features/employees/DirectoryPage.jsx';
 import { ProfilePage } from './features/employees/ProfilePage.jsx';
 import { AttendancePage } from './features/attendance/AttendancePage.jsx';
+import { TimeOffPage } from './features/leave/TimeOffPage.jsx';
 
 // Phase 05: the Employees directory ("/") is the default post-login landing route, per the
 // design's explicit "must land on this page" instruction (D-02 default — see
@@ -24,7 +24,8 @@ ReactDOM.createRoot(document.getElementById('root')).render(
             <Route path="/" element={<DirectoryPage />} />
             {/* Phase 06 replaces Phase 05's placeholder here. */}
             <Route path="/attendance" element={<AttendancePage />} />
-            <Route path="/time-off" element={<PlaceholderPage title="Time Off" />} />
+            {/* Phase 07 replaces Phase 05's placeholder here. */}
+            <Route path="/time-off" element={<TimeOffPage />} />
             <Route path="/profile/me" element={<ProfilePage mode="me" />} />
             <Route path="/profile/:id" element={<ProfilePage mode="id" />} />
           </Route>
