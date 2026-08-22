@@ -86,7 +86,7 @@ router.patch(
   requireAuth,
   requireRole('admin_hr'),
   handle(async (req, res) => {
-    const structure = await service.upsertForUserId(req.params.employeeId, parsePayload(req.body));
+    const structure = await service.upsertForUserId(req.params.employeeId, parsePayload(req.body), req.user.id);
     return res.status(200).json({ structure });
   })
 );

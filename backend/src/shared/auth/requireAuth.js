@@ -1,11 +1,11 @@
 const { sendError } = require('../response');
 const { verifyAccessToken } = require('../../modules/auth/tokens');
 
-// [RECOMMENDATION pending D-20] Convention adopted this phase:
+// D-20 [CONFIRMED Phase 10]: convention adopted Phase 03, applied uniformly through Phase 09, and
+// re-verified during Phase 10's RBAC re-audit across every Phase 02-09 endpoint:
 // 401 Unauthorized -> no valid token at all (this middleware's failure mode)
 // 403 Forbidden     -> valid token, but wrong role or not the resource owner (requireRole / requireSelfOrRole)
 // Both use the shared error envelope from Phase 01: { error: { code, message } }
-// TODO(D-20): confirm this convention before Phase 04 builds user-facing error states on top of it.
 
 // Populates req.user from a Bearer access token. Reuses Phase 02's verifyAccessToken — the JWT
 // verification logic itself is not duplicated here, only the Express middleware wrapper is.

@@ -4,14 +4,15 @@
  * else in the codebase. If any of D-06/D-25/D-26/D-29 changes, this is the only file to touch.
  */
 
-// [RECOMMENDATION pending D-26] Timezone. All timestamps are stored as timestamptz in UTC. The
+// D-26 [CONFIRMED Phase 10]: Timezone. All timestamps are stored as timestamptz in UTC. The
 // *calendar date* an attendance record belongs to is derived by converting to a single
 // configured application timezone, defaulting to 'Asia/Kolkata' (the design's public-holiday
 // list is India-specific, so this is a reasoned default, not an arbitrary one). Read from env
 // APP_TIMEZONE. Every "what day is it" question in this module routes through
-// deriveAttendanceDate() below.
-// TODO(D-26): neither source specifies timezone handling. Confirm before Phase 09 computes
-// payable days, which will inherit this date-boundary logic wholesale.
+// deriveAttendanceDate() below. Reviewed during Phase 10's security-baseline pass — Phase 09's
+// payable-days computation already inherited this date-boundary logic and passes its own tests
+// against it; accepted as the shipping behavior, single-timezone-per-deployment (no per-employee
+// or per-organization override) is not built.
 const APP_TIMEZONE = process.env.APP_TIMEZONE || 'Asia/Kolkata';
 
 // [RECOMMENDATION pending D-29] Standard workday length, used to split elapsed time into work
@@ -32,15 +33,18 @@ const STANDARD_WORK_HOURS = 8;
 // TODO(D-06): confirm threshold-based vs. manual selection vs. omit entirely.
 const HALF_DAY_THRESHOLD_HOURS = 4;
 
-// [RECOMMENDATION pending D-25] One attendance record per employee per calendar date. A second
+// D-25 [CONFIRMED Phase 10]: One attendance record per employee per calendar date. A second
 // check-in on a date that already has an open or closed record is rejected 409
-// ALREADY_CHECKED_IN. Check-out without a matching open record is rejected 409 NOT_CHECKED_IN. A
-// missed check-out leaves check_out_at NULL, work_hours NULL, and status PRESENT — no auto-close
-// job, no midnight sweep.
-// TODO(D-25): both sources are silent. Confirm whether multiple sessions per day (e.g. lunch
-// break out/in) should be supported — if yes, the unique constraint on (employee_profile_id,
-// attendance_date) must be dropped and the schema becomes one-row-per-session, which is a
-// migration, not a config change.
+// ALREADY_CHECKED_IN (unique-constraint-backed — re-verified under real concurrency by the
+// double-check-in test in tests/integration/12-attendance.test.js). Check-out without a matching
+// open record is rejected 409 NOT_CHECKED_IN. A missed check-out leaves check_out_at NULL,
+// work_hours NULL, and status PRESENT — no auto-close job, no midnight sweep; reviewed during
+// Phase 10's security-baseline pass and accepted as the shipping behavior (no source document
+// specifies auto-close-on-missed-checkout, and inventing a background job to silently mutate a
+// record the employee never closed is a bigger behavior change than this phase should make
+// unprompted). Multiple sessions per day (e.g. lunch break out/in) remains unsupported — if
+// adopted later, the unique constraint on (employee_profile_id, attendance_date) must be dropped
+// and the schema becomes one-row-per-session, which is a migration, not a config change.
 const ALLOW_MULTIPLE_SESSIONS_PER_DAY = false;
 
 // [RECOMMENDATION pending D-07] Admin manual attendance correction is NOT built this phase. No

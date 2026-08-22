@@ -13,6 +13,7 @@ import { createServer } from 'vite';
 import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { act, create } from 'react-test-renderer';
+import { MemoryRouter, Routes, Route } from 'react-router-dom';
 import path from 'node:path';
 
 const root = path.resolve(import.meta.dirname, '..');
@@ -74,10 +75,13 @@ try {
     fail(`RequireRole should render children for a matching role, got: ${allowedMarkup}`);
   }
 
-  // 3. RequireAuth — renders nothing when unauthenticated, renders children when authenticated.
-  // The browser redirect itself is a useEffect and does not run under renderToStaticMarkup;
-  // that side effect is out of reach for this Node-based smoke test.
-  const unauthMarkup = renderToStaticMarkup(withUser(null, React.createElement(RequireAuth, null, 'SECRET')));
+  // 3. RequireAuth — renders nothing (a <Navigate>, which produces no DOM output itself) when
+  // unauthenticated, renders children when authenticated. <Navigate> needs a Router ancestor even
+  // to render its no-op output, so this wraps in a bare MemoryRouter — no <Routes> needed, since
+  // section 5 below covers the actual redirect-target behavior with a full route tree.
+  const unauthMarkup = renderToStaticMarkup(
+    React.createElement(MemoryRouter, null, withUser(null, React.createElement(RequireAuth, null, 'SECRET')))
+  );
   if (unauthMarkup.includes('SECRET')) {
     fail(`RequireAuth should not render children when there is no user, got: ${unauthMarkup}`);
   }
@@ -99,26 +103,38 @@ try {
     fail(`AuthProvider should default to no user when window/localStorage are unavailable, got: ${providerMarkup}`);
   }
 
-  // 5. RequireAuth — Phase 05 now actually relies on the redirect firing (AppShell wraps every
-  // authenticated route in it), so this confirms the effect itself runs, not just the static
-  // render shape checked above. renderToStaticMarkup never runs effects; react-test-renderer
-  // does, so this uses that instead — with a minimal stubbed `window` (Node has none) just
-  // sufficient for RequireAuth's single `window.location.assign(...)` call. Kept last: mixing
+  // 5. RequireAuth — Phase 05 relies on the redirect actually landing on /signin (AppShell wraps
+  // every authenticated route in it). Phase 10 replaced the Phase 03 window.location.assign
+  // placeholder with react-router's <Navigate>, which performs its redirect imperatively (an
+  // effect), not as static render output — renderToStaticMarkup is a single pass with no effects
+  // and cannot observe it, so (as in the original Phase 03 version of this check) this uses
+  // react-test-renderer + act() to let the effect run, then inspects the committed tree: RequireAuth
+  // is mounted at /protected inside a MemoryRouter starting there, and an unauthenticated render
+  // must end up showing the /signin route's content, not SECRET. Kept last: mixing
   // react-test-renderer and react-dom/server against the same context in one process triggers a
   // harmless "multiple renderers" warning if react-dom/server runs afterward — sequencing avoids
   // the noise without changing behavior.
-  const assignCalls = [];
-  const originalWindow = globalThis.window;
-  globalThis.window = { location: { assign: (url) => assignCalls.push(url) } };
-  try {
-    await act(async () => {
-      create(withUser(null, React.createElement(RequireAuth, null, 'SECRET')));
-    });
-  } finally {
-    globalThis.window = originalWindow;
-  }
-  if (!assignCalls.includes('/signin')) {
-    fail(`RequireAuth should redirect to /signin when no user is present, got redirect calls: ${JSON.stringify(assignCalls)}`);
+  let redirectTree;
+  await act(async () => {
+    redirectTree = create(
+      React.createElement(
+        MemoryRouter,
+        { initialEntries: ['/protected'] },
+        withUser(
+          null,
+          React.createElement(
+            Routes,
+            null,
+            React.createElement(Route, { path: '/signin', element: React.createElement('span', null, 'SIGNIN_PAGE') }),
+            React.createElement(Route, { path: '/protected', element: React.createElement(RequireAuth, null, 'SECRET') })
+          )
+        )
+      )
+    );
+  });
+  const redirectMarkup = JSON.stringify(redirectTree.toJSON());
+  if (!redirectMarkup.includes('SIGNIN_PAGE') || redirectMarkup.includes('SECRET')) {
+    fail(`RequireAuth should redirect to /signin when no user is present, got: ${redirectMarkup}`);
   }
 } finally {
   await server.close();

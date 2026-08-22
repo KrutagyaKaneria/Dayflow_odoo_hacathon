@@ -18,8 +18,10 @@ function generateInitialPassword() {
   return crypto.randomBytes(18).toString('base64url');
 }
 
-// [RECOMMENDATION pending D-16] Default policy — min 8 chars, at least one letter and one digit.
-// Change this single constant/function when D-16 is resolved; do not scatter the rule across files.
+// D-16 [CONFIRMED Phase 10]: min 8 chars, at least one letter and one digit — reviewed during
+// Phase 10's security-baseline pass and accepted as the shipping policy (no stricter requirement,
+// e.g. special characters or a longer minimum, was specified by either source document). Change
+// this single constant/function if that changes; do not scatter the rule across files.
 function validatePasswordPolicy(password) {
   if (typeof password !== 'string') return false;
   if (password.length < 8) return false;

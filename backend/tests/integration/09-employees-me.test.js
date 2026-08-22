@@ -9,6 +9,7 @@ const { createApp } = require('../../src/app');
 const { prisma } = require('../../src/config/db');
 const { truncateAuthTables } = require('./support/authTestHelpers');
 const { createEmployeeWithProfile } = require('./support/employeeTestHelpers');
+const { decryptField } = require('../../src/shared/security/fieldEncryption');
 
 const app = createApp();
 
@@ -111,7 +112,10 @@ describe('PATCH /employees/me — field-level edit policy (D-21)', () => {
 
     expect(res.status).toBe(200);
     const stored = await prisma.employeeBankDetails.findUnique({ where: { employeeProfileId: profile.id } });
-    expect(stored.accountNumber).toBe('ORIGINAL');
+    // Phase 10: account_number is encrypted at rest — the raw column is ciphertext, never the
+    // literal plaintext, even for a value the endpoint left untouched.
+    expect(stored.accountNumber).not.toBe('ORIGINAL');
+    expect(decryptField(stored.accountNumber)).toBe('ORIGINAL');
   });
 
   test('skills must be an array -> 400', async () => {
@@ -155,7 +159,7 @@ describe('POST /employees/me/avatar', () => {
   test('a valid image sets avatarUrl and persists it', async () => {
     const { user, password } = await createEmployeeWithProfile();
     const accessToken = await signIn(user.email, password);
-    const filePath = tmpFile('avatar.png', Buffer.from([0x89, 0x50, 0x4e, 0x47])); // PNG magic bytes, tiny
+    const filePath = tmpFile('avatar.png', Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00, 0x00])); // full PNG signature (Phase 10 content-sniffing needs the real 8-byte magic, not a truncated prefix)
 
     const res = await request(app)
       .post('/employees/me/avatar')
@@ -174,7 +178,7 @@ describe('POST /employees/me/avatar', () => {
   test('the uploaded avatar is retrievable via the static /uploads route', async () => {
     const { user, password } = await createEmployeeWithProfile();
     const accessToken = await signIn(user.email, password);
-    const filePath = tmpFile('avatar.png', Buffer.from([0x89, 0x50, 0x4e, 0x47]));
+    const filePath = tmpFile('avatar.png', Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00, 0x00])); // full PNG signature
 
     const uploadRes = await request(app)
       .post('/employees/me/avatar')
@@ -223,7 +227,7 @@ describe('POST /employees/me/avatar', () => {
   });
 
   test('no token -> 401', async () => {
-    const filePath = tmpFile('avatar.png', Buffer.from([0x89, 0x50, 0x4e, 0x47]));
+    const filePath = tmpFile('avatar.png', Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00, 0x00])); // full PNG signature
     const res = await request(app).post('/employees/me/avatar').attach('avatar', filePath);
     expect(res.status).toBe(401);
     fs.unlinkSync(filePath);

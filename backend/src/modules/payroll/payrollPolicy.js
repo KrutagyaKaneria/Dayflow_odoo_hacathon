@@ -83,10 +83,27 @@ const WAGE_CONSTRAINT_INCLUDES_DEDUCTIONS = false;
 // against an overwritten structure means the earlier number can never be reconstructed.
 const ENABLE_SALARY_VERSIONING = false;
 
-// NOTE: D-23 (audit log) is a Phase 10 decision and is NOT built here. Read together with the
-// overwrite default above, that means salary changes are currently untracked in both directions
-// — no version history AND no audit trail. Flagged, not solved. This is the single largest
-// data-loss exposure in the system as currently planned.
+// D-22 [Phase 10 — concurrency sub-question RESOLVED, versioning sub-question STILL OPEN]:
+// Phase 10's security-hardening pass assessed the concurrent-edit risk this overwrite-in-place
+// default carries — two Admins PATCHing the same employee's salary structure at once — and
+// accepted LAST-WRITE-WINS rather than building optimistic concurrency control (e.g. an
+// If-Match/version-column check) this phase. Reasoning: neither source document specifies
+// concurrent-editor conflict behavior, admin-side concurrent edits of the SAME employee's salary
+// are an infrequent operational scenario (not a high-traffic user-facing race like check-in), and
+// building real optimistic locking is exactly the kind of invented-from-nothing data model this
+// phase is scoped to avoid. If concurrent Admin salary edits become a real operational problem,
+// add a version column and a conditional update — not before.
+//
+// NOTE: the ORIGINAL versioning question above (should salary changes be historized at all) is
+// UNCHANGED and remains OPEN — that is a separate, larger product decision, not resolved by this
+// phase's concurrency assessment.
+//
+// D-23's audit log (shared/audit/auditLog.js) now records WHO changed WHOSE salary structure WHEN
+// on every upsert — it does NOT record the old/new monetary values (see auditLog.js's redaction
+// discipline) and does NOT reconstruct a prior figure. It closes the "untracked in both
+// directions" gap partially (an edit is no longer invisible) but not the versioning gap (the
+// PRIOR VALUE still cannot be recovered) — that half of the exposure described below is unchanged
+// by Phase 10.
 
 // [RECOMMENDATION pending D-37] Currency is declared as a single constant 'INR', not stored per-
 // record and not user-selectable. The design shows the rupee symbol throughout but never

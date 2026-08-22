@@ -9,7 +9,7 @@ const { sendError } = require('../response');
 // param for a resource keyed directly by user id, or a DB lookup for one that isn't. May be sync
 // or async.
 //
-// Must run after requireAuth, for the same reason as requireRole. [RECOMMENDATION pending D-20]:
+// Must run after requireAuth, for the same reason as requireRole. D-20 [CONFIRMED Phase 10]:
 // 403 on failure, same convention as requireRole — see requireAuth.js.
 function requireSelfOrRole(getResourceOwnerId, ...allowedRoles) {
   return async function (req, res, next) {

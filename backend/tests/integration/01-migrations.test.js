@@ -76,7 +76,7 @@ afterAll(async () => {
   });
 });
 
-test('migrations apply cleanly on a fresh database and create all tables (Phase 01 + Phase 02 + Phase 04 + Phase 06 + Phase 07 + Phase 08)', () => {
+test('migrations apply cleanly on a fresh database and create all tables (Phase 01 + Phase 02 + Phase 04 + Phase 06 + Phase 07 + Phase 08 + Phase 10)', () => {
   runMigrateDeploy();
 
   const client = new Client({ connectionString: scratchUrl() });
@@ -90,6 +90,7 @@ test('migrations apply cleanly on a fresh database and create all tables (Phase 
         expect(res.rows.map((r) => r.table_name)).toEqual([
           '_prisma_migrations',
           'attendance_records',
+          'audit_log',
           'email_verification_tokens',
           'employee_bank_details',
           'employee_profiles',
@@ -105,7 +106,7 @@ test('migrations apply cleanly on a fresh database and create all tables (Phase 
       })
       .finally(() => client.end())
   );
-});
+}, 15000); // Phase 10 added a 13th migration; deploying the full chain to a fresh scratch DB now exceeds Jest's 5s default.
 
 test('every migration is reversible via its down.sql (schema returns to empty)', async () => {
   await applyAllDowns();

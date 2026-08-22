@@ -2,6 +2,7 @@ const { prisma } = require('../../config/db');
 const { LeaveError } = require('./errors');
 const { countDays, rangesOverlap, deriveBalance, resolveAllocatedDays, toDateOnlyString } = require('./leavePolicy');
 const { syncApprovedLeaveToAttendance } = require('../integration/syncLeaveApprovalToAttendance');
+const { recordAuditEvent } = require('../../shared/audit/auditLog');
 
 const VALID_LEAVE_TYPES = ['paid_time_off', 'sick_leave', 'unpaid_leave'];
 const ACTIVE_STATUSES = ['pending', 'approved'];
@@ -212,6 +213,15 @@ async function decide(adminUserId, leaveId, action, adminComment) {
       const syncResult = await syncApprovedLeaveToAttendance(tx, record);
       attendanceSyncSkippedDates = syncResult.skippedDates;
     }
+
+    // D-23 audit trail — leave approve/reject.
+    await recordAuditEvent(tx, {
+      actorUserId: adminUserId,
+      action: `leave.${action}`,
+      targetType: 'leave_request',
+      targetId: leaveId,
+      metadata: { employeeProfileId: record.employeeProfileId, leaveType: record.leaveType },
+    });
 
     return { record, attendanceSyncSkippedDates };
   });

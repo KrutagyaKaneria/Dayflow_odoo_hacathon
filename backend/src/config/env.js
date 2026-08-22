@@ -27,6 +27,14 @@ function loadConfig() {
     throw new Error('Missing required environment variable JWT_ACCESS_SECRET.');
   }
 
+  // Phase 10 — Security Hardening. Field-level encryption for Bank Details (account_number,
+  // pan_no, uan_no — see shared/security/fieldEncryption.js). Required, not defaulted: an
+  // encryption key with a hardcoded fallback is not a real key. Must be a 32-byte value,
+  // base64-encoded (AES-256-GCM).
+  if (!process.env.FIELD_ENCRYPTION_KEY) {
+    throw new Error('Missing required environment variable FIELD_ENCRYPTION_KEY.');
+  }
+
   return {
     nodeEnv,
     isProduction: nodeEnv === 'production',
@@ -37,6 +45,14 @@ function loadConfig() {
     jwtAccessSecret: process.env.JWT_ACCESS_SECRET,
     jwtAccessTtl: process.env.JWT_ACCESS_TTL || '15m',
     refreshTokenTtlDays: parseInt(process.env.REFRESH_TOKEN_TTL_DAYS, 10) || 7,
+    fieldEncryptionKey: process.env.FIELD_ENCRYPTION_KEY,
+    // [RECOMMENDATION] Phase 10 — replaces Phase 01's TEMP permissive CORS (hardcoded single
+    // origin in app.js). Comma-separated allow-list; defaults to the local Vite dev server so
+    // `npm run dev` keeps working out of the box.
+    corsAllowedOrigins: (process.env.CORS_ALLOWED_ORIGINS || 'http://localhost:5173')
+      .split(',')
+      .map((origin) => origin.trim())
+      .filter(Boolean),
   };
 }
 

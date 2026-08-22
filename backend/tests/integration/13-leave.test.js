@@ -330,7 +330,7 @@ describe('Cross-employee isolation', () => {
     const tokenB = await signIn(userB.email, passwordB);
 
     const filePath = path.join(os.tmpdir(), `dayflow-leave-${Date.now()}.png`);
-    fs.writeFileSync(filePath, Buffer.from([0x89, 0x50, 0x4e, 0x47]));
+    fs.writeFileSync(filePath, Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00, 0x00])); // full PNG signature
     const uploadRes = await request(app)
       .post('/leaves/attachment')
       .set('Authorization', `Bearer ${tokenA}`)
@@ -357,7 +357,7 @@ describe('Cross-employee isolation', () => {
     const empToken = await signIn(emp.email, empPassword);
 
     const filePath = path.join(os.tmpdir(), `dayflow-leave-${Date.now()}.png`);
-    fs.writeFileSync(filePath, Buffer.from([0x89, 0x50, 0x4e, 0x47]));
+    fs.writeFileSync(filePath, Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00, 0x00])); // full PNG signature
     const uploadRes = await request(app)
       .post('/leaves/attachment')
       .set('Authorization', `Bearer ${empToken}`)

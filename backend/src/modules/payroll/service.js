@@ -1,6 +1,7 @@
 const { prisma } = require('../../config/db');
 const { PayrollError } = require('./errors');
 const { calculateSalary, validateYearlyWage } = require('./calculateSalary');
+const { recordAuditEvent } = require('../../shared/audit/auditLog');
 
 const VALID_COMPONENT_KINDS = ['earning', 'deduction_employee', 'contribution_employer'];
 const VALID_COMPUTATION_TYPES = ['fixed_amount', 'percentage'];
@@ -178,7 +179,7 @@ function preview(payload) {
 // rejected update must leave the prior structure completely untouched. Transactional: replacing
 // the component set is a delete-then-insert, and a partial failure leaving an employee with half
 // a salary structure is worse than a rejected update.
-async function upsertForUserId(targetUserId, payload) {
+async function upsertForUserId(targetUserId, payload, actorUserId) {
   validatePayload(payload);
 
   const engineResult = calculateSalary({
@@ -225,6 +226,17 @@ async function upsertForUserId(targetUserId, payload) {
         description: c.description ?? null,
         displayOrder: c.displayOrder,
       })),
+    });
+
+    // D-23 audit trail — salary change. No monetary figures/component values in metadata: the
+    // structure itself is the durable record of what changed; the audit entry proves WHO changed
+    // WHOSE structure WHEN, which is what D-23 asks the trail to answer.
+    await recordAuditEvent(tx, {
+      actorUserId,
+      action: 'salary.upsert',
+      targetType: 'salary_structure',
+      targetId: upserted.id,
+      metadata: { employeeProfileId, componentCount: payload.components.length },
     });
 
     return tx.salaryStructure.findUnique({

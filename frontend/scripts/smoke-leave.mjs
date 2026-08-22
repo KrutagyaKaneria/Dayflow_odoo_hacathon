@@ -20,12 +20,18 @@ function fail(message) {
 const server = await createServer({ root, server: { middlewareMode: true }, appType: 'custom' });
 
 try {
+  // react-router-dom must be ssrLoadModule'd FIRST, before any local module that transitively
+  // imports it (Phase 10: RequireAuth.jsx, reached via the app/auth barrel that TimeOffPage.jsx
+  // imports RequireRole from, now imports react-router-dom's <Navigate>) — loading the bare
+  // package directly as a second, later ssrLoadModule target after it's already been pulled in
+  // transitively produces a "module is not defined" SSR evaluation error. Same ordering
+  // smoke-directory.mjs already used.
+  const { MemoryRouter } = await server.ssrLoadModule('react-router-dom');
   const { previewDayCount } = await server.ssrLoadModule('/src/features/leave/dayCount.js');
   const { buildDayStatusMap, buildHolidaySet } = await server.ssrLoadModule('/src/features/leave/YearCalendar.jsx');
   const { STATUS_LABELS, LEAVE_TYPE_LABELS } = await server.ssrLoadModule('/src/features/leave/statusLabels.js');
   const { TimeOffPage } = await server.ssrLoadModule('/src/features/leave/TimeOffPage.jsx');
   const { AuthContext } = await server.ssrLoadModule('/src/app/auth/AuthContext.jsx');
-  const { MemoryRouter } = await server.ssrLoadModule('react-router-dom');
 
   // 1. previewDayCount — same D-30 inclusive default as the backend, including the design's
   // known divergence (May 13 -> May 14 is 2 days here, not the mockup's 1).

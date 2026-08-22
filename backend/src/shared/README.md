@@ -53,16 +53,13 @@ ownership check in a route file. See the module docstrings for full detail.
   `getResourceOwnerId(req)` may be sync or async. No endpoint uses this yet as of Phase 03 —
   it exists so Phase 04 can import it directly rather than reimplement ownership checks.
 
-**401-vs-403 convention** — `[RECOMMENDATION pending D-20]`, adopted this phase and applied
-consistently everywhere above:
+**401-vs-403 convention** — `D-20 [CONFIRMED Phase 10]`, adopted Phase 03 and applied
+consistently across every Phase 02-09 endpoint, re-verified in Phase 10's RBAC re-audit:
 
 | Status | Meaning |
 |---|---|
 | 401 `UNAUTHORIZED` | No valid token at all — `requireAuth` failure |
 | 403 `FORBIDDEN` | Valid token, but wrong role or not the resource owner — `requireRole` / `requireSelfOrRole` failure |
-
-`TODO(D-20)`: confirm this convention before Phase 04 builds user-facing error states on top
-of it — it is a documented default, not a final decision.
 
 ## What does NOT exist yet (by design)
 

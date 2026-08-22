@@ -1,7 +1,8 @@
 const path = require('path');
 const express = require('express');
+const helmet = require('helmet');
 const cookieParser = require('cookie-parser');
-const { checkDbConnection } = require('./config/db');
+const { checkDbConnection, config } = require('./config/db');
 const { sendError } = require('./shared/response');
 const authRoutes = require('./modules/auth/routes');
 const employeesRoutes = require('./modules/employees/routes');
@@ -12,6 +13,11 @@ const payrollRoutes = require('./modules/payroll/routes');
 function createApp({ db = { checkDbConnection } } = {}) {
   const app = express();
 
+  // Phase 10 — Security Hardening, item 8. Standard security headers (HSTS, X-Content-Type-Options,
+  // X-Frame-Options, etc). `crossOriginResourcePolicy` is relaxed to same-site rather than the
+  // default same-origin so /uploads (avatars) still load from the frontend's separate origin.
+  app.use(helmet({ crossOriginResourcePolicy: { policy: 'same-site' } }));
+
   app.use(express.json());
   app.use(cookieParser());
 
@@ -20,10 +26,18 @@ function createApp({ db = { checkDbConnection } } = {}) {
   // service (S3 etc.) is being introduced ad hoc here.
   app.use('/uploads', express.static(path.join(__dirname, '..', 'uploads')));
 
-  // TEMP - revisit in Phase 10: bare-minimum CORS allow for local frontend dev only.
-  // Full security middleware (CORS policy, rate limiting, etc.) begins in Phase 02/10.
+  // Phase 10 — Security Hardening, item 8. Replaces Phase 01's TEMP single-hardcoded-origin CORS
+  // with an env-driven allow-list (CORS_ALLOWED_ORIGINS, config/env.js). No `credentials: true` is
+  // set: the refresh-token cookie is SameSite=Lax (see auth/routes.js) and was never sent
+  // cross-origin even under the old TEMP block (see frontend/src/features/auth/api.js's comment on
+  // `logout`) — this phase does not change that behavior, only makes the origin list configurable
+  // instead of hardcoded.
   app.use((req, res, next) => {
-    res.header('Access-Control-Allow-Origin', 'http://localhost:5173');
+    const origin = req.header('Origin');
+    if (origin && config.corsAllowedOrigins.includes(origin)) {
+      res.header('Access-Control-Allow-Origin', origin);
+      res.header('Vary', 'Origin');
+    }
     res.header('Access-Control-Allow-Methods', 'GET,POST,PUT,PATCH,DELETE,OPTIONS');
     res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
     if (req.method === 'OPTIONS') return res.sendStatus(204);

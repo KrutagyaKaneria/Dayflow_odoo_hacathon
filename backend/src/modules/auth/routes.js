@@ -2,6 +2,7 @@ const express = require('express');
 const { sendError } = require('../../shared/response');
 const { config } = require('../../config/db');
 const { requireAuth, requireRole } = require('../../shared/auth');
+const { signInLimiter, refreshLimiter } = require('../../shared/security/rateLimiters');
 const { AuthError } = require('./errors');
 const service = require('./service');
 
@@ -39,6 +40,7 @@ function readRefreshToken(req) {
 
 router.post(
   '/auth/signin',
+  signInLimiter,
   handle(async (req, res) => {
     const { identifier, password } = req.body || {};
     if (!identifier || !password) {
@@ -58,6 +60,7 @@ router.post(
 
 router.post(
   '/auth/refresh',
+  refreshLimiter,
   handle(async (req, res) => {
     const rawToken = readRefreshToken(req);
     if (!rawToken) {
@@ -155,7 +158,7 @@ router.post(
       user: service.publicUser(user),
       profile: { id: profile.id, name: profile.name, dateOfJoining: profile.dateOfJoining },
       // Returned once, synchronously, only to the calling admin — never stored or logged again.
-      // TODO(D-19): temporary delivery behavior, see service.js.
+      // D-19 [RESOLVED Phase 10, non-production acceptance] — see service.js.
       initialPassword,
     });
   })

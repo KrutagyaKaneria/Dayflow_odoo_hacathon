@@ -7,6 +7,7 @@ const { createApp } = require('../../src/app');
 const { prisma } = require('../../src/config/db');
 const { truncateAuthTables } = require('./support/authTestHelpers');
 const { createEmployeeWithProfile } = require('./support/employeeTestHelpers');
+const { decryptField } = require('../../src/shared/security/fieldEncryption');
 
 const app = createApp();
 
@@ -96,7 +97,10 @@ describe('PATCH /employees/:id', () => {
     const storedBank = await prisma.employeeBankDetails.findUnique({
       where: { employeeProfileId: targetProfile.id },
     });
-    expect(storedBank.accountNumber).toBe('444555666');
+    // Phase 10: account_number is encrypted at rest — the raw column is ciphertext, and
+    // decrypting it recovers exactly what the Admin wrote.
+    expect(storedBank.accountNumber).not.toBe('444555666');
+    expect(decryptField(storedBank.accountNumber)).toBe('444555666');
   });
 
   test('Admin cannot change system/immutable fields (dateOfJoining) via this endpoint', async () => {

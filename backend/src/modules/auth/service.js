@@ -1,3 +1,4 @@
+const crypto = require('crypto');
 const { prisma } = require('../../config/db');
 const { AuthError } = require('./errors');
 const { generateLoginId } = require('./loginId');
@@ -5,6 +6,7 @@ const { hashPassword, verifyPassword, generateInitialPassword, validatePasswordP
 const { signAccessToken } = require('./tokens');
 const refreshTokenStore = require('./refreshTokenStore');
 const { issueEmailVerificationToken, verifyEmail: verifyEmailToken } = require('./emailVerification');
+const { recordAuditEvent } = require('../../shared/audit/auditLog');
 
 const VALID_ROLES = ['employee', 'admin_hr'];
 
@@ -36,11 +38,13 @@ async function signIn({ identifier, password }) {
     throw new AuthError(401, 'INVALID_CREDENTIALS', 'Invalid credentials.');
   }
 
-  // TODO(D-17): unverified-sign-in behavior is open. Default implemented here:
+  // D-17 [CONFIRMED Phase 10]: unverified accounts are blocked from signing in.
   //   - Path A accounts have email_verified_at set at creation (see provisionEmployeeAccount) so
   //     they always pass this check.
   //   - Path B accounts are blocked until POST /auth/verify-email is called.
-  // Confirm this is the desired behavior, not assumed permanent.
+  // Reviewed during Phase 10's security-baseline pass and accepted as the shipping behavior —
+  // ENABLE_SELF_SERVICE_SIGNUP is off by default (D-01 still open), so this mainly governs Path A
+  // today, where it's already always-satisfied; it matters once/if Path B is enabled.
   if (!user.emailVerifiedAt) {
     throw new AuthError(403, 'EMAIL_NOT_VERIFIED', 'Email not verified.');
   }
@@ -123,7 +127,10 @@ async function verifyEmail(rawToken) {
 // Path A — Admin-provisioned account creation (design's Note), always available
 // ---------------------------------------------------------------------------
 
-const MAX_LOGIN_ID_ATTEMPTS = 5;
+// Phase 10 — Security Hardening, item 10 (concurrency correctness). Raised from 5: with jitter
+// added below, a burst of concurrent provisioning requests may need a few rounds to fully
+// desync, and each request gets its own independent budget of attempts to do so.
+const MAX_LOGIN_ID_ATTEMPTS = 10;
 
 async function provisionEmployeeAccount(adminUser, { firstName, lastName, email, dateOfJoining, department, location, role }) {
   if (!adminUser.organizationId) {
@@ -151,10 +158,21 @@ async function provisionEmployeeAccount(adminUser, { firstName, lastName, email,
     // Serial number is derived from a count query; it is NOT trusted alone under concurrency — the
     // unique constraint on users.login_id is the real backstop, and a P2002 here just bumps the
     // attempt and retries (see catch below).
+    //
+    // Phase 10 — Security Hardening, item 10 (concurrency correctness): a bare `existingCount + 1
+    // + attempt` LOCKSTEP-collides under real concurrency. N simultaneous requests all read the
+    // same existingCount before any of them commits, so all N compute the SAME candidate on
+    // attempt 0 and only one wins; the N-1 losers then all retry at attempt 1 and compute the
+    // SAME next candidate as EACH OTHER again, and so on — they keep colliding with each other,
+    // not converging, and can exhaust MAX_LOGIN_ID_ATTEMPTS purely from bad luck in a burst
+    // (confirmed by a concurrency test that reproduced exactly this before this fix). Random
+    // jitter on every retry (never on attempt 0, so the common uncontended case still gets the
+    // next sequential serial number with no gap) desyncs concurrent retriers from each other.
     const existingCount = await prisma.employeeProfile.count({
       where: { organizationId: organization.id, dateOfJoining: { gte: yearStart, lt: yearEnd } },
     });
-    const serialNumber = existingCount + 1 + attempt;
+    const jitter = attempt === 0 ? 0 : crypto.randomInt(1, 10 * MAX_LOGIN_ID_ATTEMPTS);
+    const serialNumber = existingCount + 1 + attempt + jitter;
     const loginId = generateLoginId({ companyName: organization.name, firstName, lastName, joinYear, serialNumber });
 
     try {
@@ -184,12 +202,25 @@ async function provisionEmployeeAccount(adminUser, { firstName, lastName, email,
             dateOfJoining: joinDate,
           },
         });
+        // D-23 audit trail — account provisioning. No password/hash in metadata — see
+        // recordAuditEvent's docstring.
+        await recordAuditEvent(tx, {
+          actorUserId: adminUser.id,
+          action: 'employee.provision',
+          targetType: 'user',
+          targetId: user.id,
+          metadata: { role: resolvedRole, loginId },
+        });
+
         return { user, profile };
       });
 
-      // TODO(D-19): replace this temporary "show once in API response" behavior with a real secure
-      // delivery mechanism before this feature ships to real users — flagged, not solved, in this
-      // phase. The plaintext password is never stored or logged past this point.
+      // D-19 [RESOLVED Phase 10, non-production acceptance]: real out-of-band delivery (email/SMS)
+      // is explicitly out of scope this phase (no sign-off was given, and Phase 10/11 both bar
+      // building third-party email/SMS integration without one) — "show once in the provisioning
+      // API response, to the calling admin only" is accepted as the shipping behavior for this
+      // build, not a still-open TODO. Revisit if/when real delivery is authorized. The plaintext
+      // password is never stored or logged past this point.
       return { user: result.user, profile: result.profile, initialPassword };
     } catch (err) {
       if (err.code === 'P2002') {
@@ -199,7 +230,11 @@ async function provisionEmployeeAccount(adminUser, { firstName, lastName, email,
       throw err;
     }
   }
-  throw lastError;
+  // Phase 10: retries exhausted under sustained contention — a real (if now much rarer, thanks to
+  // the jitter above) possibility, not a bug in itself. Surface a clean, actionable 409, not the
+  // raw Prisma error — routes.js's `handle()` only special-cases AuthError, so an unwrapped error
+  // here would otherwise fall through to an opaque 500 with no indication a retry would help.
+  throw new AuthError(409, 'LOGIN_ID_ALLOCATION_CONFLICT', 'Could not allocate a unique login id under contention — please retry.');
 }
 
 module.exports = {

@@ -73,6 +73,7 @@ model User {
   refreshTokens           RefreshToken[]
   emailVerificationTokens EmailVerificationToken[]
   decidedLeaveRequests    LeaveRequest[]           @relation("LeaveDecidedBy")
+  auditLogEntries         AuditLog[]
 
   // TODO(D-01): registration model (self-service per PDF §3.1.1 vs. admin-provisioned per design Note) is unresolved.
   // This schema supports either outcome:
@@ -139,21 +140,32 @@ model EmployeeProfile {
   // User's Employee Profile is never cascade-deleted implicitly. Revisit once account-deletion
   // semantics are decided.
 
+  // Phase 10 — Security Hardening, item 11 (performance indexes, hot paths only). `name` backs
+  // `ORDER BY name ASC` on every directory-style listing that queries this table: GET /employees
+  // (employees/service.js listEmployees), GET /payroll (payroll/service.js listAll), and the
+  // Admin day-scoped attendance list (attendance/service.js). `(organizationId, dateOfJoining)`
+  // backs the login-id serial-number count query in auth/service.js's provisionEmployeeAccount —
+  // now run up to MAX_LOGIN_ID_ATTEMPTS (10) times per request under contention (see the Phase 10
+  // Login ID concurrency fix), making it hot enough to index.
+  @@index([name])
+  @@index([organizationId, dateOfJoining])
   @@map("employee_profiles")
 }
 
 /// Phase 04. One-to-one with EmployeeProfile. Admin-only editable (src/modules/employees/
 /// editPolicy.js ADMIN_EDITABLE_BANK_FIELDS) — no employee-editable path exists for this table.
-/// [RECOMMENDATION pending Phase 10 hardening]: accountNumber/panNo are high-sensitivity PII,
-/// stored in plaintext with standard DB access controls only — see the migration comment.
+/// Phase 10: accountNumber/panNo/uanNo are encrypted at rest at the application layer (AES-256-GCM,
+/// see shared/security/fieldEncryption.js) — the column still stores a VARCHAR, but its content is
+/// ciphertext, never plaintext. pan_no/uan_no were widened from VARCHAR(50) to VARCHAR(255) to fit
+/// the ciphertext (see the widen_bank_details_encrypted_columns migration).
 model EmployeeBankDetails {
   id                String   @id @default(uuid()) @db.Uuid
   employeeProfileId String   @unique @map("employee_profile_id") @db.Uuid
   accountNumber     String?  @map("account_number") @db.VarChar(255)
   bankName          String?  @map("bank_name") @db.VarChar(255)
   ifscCode          String?  @map("ifsc_code") @db.VarChar(50)
-  panNo             String?  @map("pan_no") @db.VarChar(50)
-  uanNo             String?  @map("uan_no") @db.VarChar(50)
+  panNo             String?  @map("pan_no") @db.VarChar(255)
+  uanNo             String?  @map("uan_no") @db.VarChar(255)
   empCode           String?  @map("emp_code") @db.VarChar(50)
   createdAt         DateTime @default(now()) @map("created_at") @db.Timestamp(3)
   updatedAt         DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamp(3)
@@ -384,4 +396,27 @@ model SalaryComponent {
 
   @@index([salaryStructureId])
   @@map("salary_components")
+}
+
+/// Phase 10 — Security Hardening, item 3 (D-23). Append-only: no update/delete path exists
+/// anywhere in the app for this table — only auditLog.create. Records the four action classes
+/// D-23 requires: salary changes, admin profile edits, leave approve/reject, account provisioning
+/// — see shared/audit/auditLog.js for the single write path all four route handlers call through.
+/// `metadata` NEVER contains raw bank account numbers/PAN/UAN, password hashes, or refresh/access
+/// tokens — see recordAuditEvent's docstring for the exact redaction discipline.
+model AuditLog {
+  id            String   @id @default(uuid()) @db.Uuid
+  actorUserId   String?  @map("actor_user_id") @db.Uuid
+  action        String   @db.VarChar(100)
+  targetType    String   @map("target_type") @db.VarChar(100)
+  targetId      String?  @map("target_id") @db.Uuid
+  metadata      Json     @default("{}")
+  createdAt     DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  actor User? @relation(fields: [actorUserId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+
+  @@index([targetType, targetId])
+  @@index([actorUserId])
+  @@index([createdAt])
+  @@map("audit_log")
 }

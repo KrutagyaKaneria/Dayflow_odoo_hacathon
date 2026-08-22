@@ -143,4 +143,39 @@ describe('POST /employees/provision', () => {
     expect(stored.organizationId).toBe(callerOrg.id);
     expect(stored.organizationId).not.toBe(otherOrg.id);
   });
+
+  // Phase 10 — Security Hardening, item 10 (concurrency correctness). The serial number in
+  // service.js's provisionEmployeeAccount comes from a COUNT query, not a lock — under
+  // concurrency, two requests can read the same count and compute the same candidate serial
+  // number/login id. The MAX_LOGIN_ID_ATTEMPTS retry loop (catch users.login_id's P2002 and bump
+  // the attempt) is what's supposed to make this safe. This test fires N provisioning requests at
+  // once for the same org/year and asserts the retry loop actually delivers on that: every
+  // request succeeds, and every resulting login id is unique — never that some requests silently
+  // fail or that two accounts end up sharing one login id.
+  test('concurrent provisioning requests for the same org/year all succeed with unique login ids (serial-number race retry)', async () => {
+    const org = await createOrganization({ name: 'Odoo India' });
+    const { user: admin, password } = await createSignedInUser({ role: 'admin_hr', organizationId: org.id });
+    const accessToken = await signInAndGetAccessToken(admin.email, password);
+
+    const CONCURRENCY = 8;
+    const responses = await Promise.all(
+      Array.from({ length: CONCURRENCY }, (_, i) =>
+        request(app)
+          .post('/employees/provision')
+          .set('Authorization', `Bearer ${accessToken}`)
+          .send({
+            firstName: 'Race',
+            lastName: `Candidate${i}`,
+            email: `race-candidate-${i}@example.com`,
+            dateOfJoining: '2024-03-10',
+          })
+      )
+    );
+
+    for (const res of responses) {
+      expect(res.status).toBe(201);
+    }
+    const loginIds = responses.map((res) => res.body.user.loginId);
+    expect(new Set(loginIds).size).toBe(CONCURRENCY); // no two requests got the same login id
+  }, 20000);
 });

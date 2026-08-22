@@ -19,6 +19,13 @@ function fail(message) {
 const server = await createServer({ root, server: { middlewareMode: true }, appType: 'custom' });
 
 try {
+  // react-router-dom must be ssrLoadModule'd FIRST, before any local module that transitively
+  // imports it (Phase 10: RequireAuth.jsx, reached via the app/auth barrel that AttendancePage.jsx
+  // imports RequireRole from, now imports react-router-dom's <Navigate>) — loading the bare
+  // package directly as a second, later ssrLoadModule target after it's already been pulled in
+  // transitively produces a "module is not defined" SSR evaluation error. Same ordering
+  // smoke-directory.mjs already used.
+  const { MemoryRouter } = await server.ssrLoadModule('react-router-dom');
   const { currentMonth, shiftMonth, formatMonthLabel } = await server.ssrLoadModule(
     '/src/features/attendance/monthUtils.js'
   );
@@ -27,7 +34,6 @@ try {
   const { AttendancePage } = await server.ssrLoadModule('/src/features/attendance/AttendancePage.jsx');
   const { isNavStatusDotGreen } = await server.ssrLoadModule('/src/app/nav/attendanceStatusDot.js');
   const { AuthContext } = await server.ssrLoadModule('/src/app/auth/AuthContext.jsx');
-  const { MemoryRouter } = await server.ssrLoadModule('react-router-dom');
 
   // R-D08: nav status dot is green only while checked in AND not yet checked out; red otherwise
   // (including after check-out — see the [INFERENCE] note in TopNav.jsx).

@@ -177,7 +177,8 @@ router.patch(
     const profile = await service.adminUpdateProfile(
       req.params.id,
       profileFields,
-      Object.keys(bankFields).length > 0 ? bankFields : undefined
+      Object.keys(bankFields).length > 0 ? bankFields : undefined,
+      req.user.id
     );
     return res.status(200).json({ profile: toProfileResponse(profile) });
   })
