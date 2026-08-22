@@ -1,0 +1,109 @@
+// Dayflow HRMS — Phase 01: foundational data model & environment.
+//
+// Scope of this schema (Phase 01 ONLY): organizations, users, employee_profiles.
+// Every other entity on the master roadmap (Attendance, Leave, Salary, etc.)
+// belongs to later phases and is deliberately absent here.
+//
+// Open decisions that shaped this schema — do NOT resolve them silently:
+//   D-01: registration model (self-service per PDF §3.1.1 vs admin-provisioned
+//         per design note) — see the `users` model comments.
+//   D-21: exact employee-editable field set — see `employee_profiles` comments.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+/// Account role. Schema only in Phase 01 — no enforcement/RBAC logic exists
+/// yet (RBAC middleware is Phase 03).
+enum Role {
+  employee
+  admin_hr
+}
+
+model Organization {
+  // TODO(D-01): if the resolved signup model is pure self-service with no company concept, this
+  // table may end up single-row-per-deployment or unused. Do not delete it speculatively; wait
+  // for Phase 02's decision to be recorded in the Decision Register before altering.
+  id           String   @id @default(uuid()) @db.Uuid
+  name         String   @db.VarChar(255)
+  logoUrl      String?  @map("logo_url") @db.VarChar(255)
+  contactName  String?  @map("contact_name") @db.VarChar(255)
+  contactEmail String?  @map("contact_email") @db.VarChar(255)
+  contactPhone String?  @map("contact_phone") @db.VarChar(255)
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamp(3)
+  updatedAt    DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamp(3)
+
+  users            User[]
+  employeeProfiles EmployeeProfile[]
+
+  @@map("organizations")
+}
+
+model User {
+  id                 String    @id @default(uuid()) @db.Uuid
+  organizationId     String?   @map("organization_id") @db.Uuid
+  loginId            String?   @unique @map("login_id") @db.VarChar(255)
+  email              String    @unique @db.VarChar(255)
+  passwordHash       String?   @map("password_hash") @db.VarChar(255)
+  role               Role
+  emailVerifiedAt    DateTime? @map("email_verified_at") @db.Timestamp(3)
+  mustChangePassword Boolean   @default(false) @map("must_change_password")
+  createdByUserId    String?   @map("created_by_user_id") @db.Uuid
+  createdAt          DateTime  @default(now()) @map("created_at") @db.Timestamp(3)
+  updatedAt          DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamp(3)
+
+  organization     Organization?     @relation(fields: [organizationId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  createdBy        User?             @relation("UserCreatedBy", fields: [createdByUserId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  createdUsers     User[]            @relation("UserCreatedBy")
+  employeeProfile  EmployeeProfile?
+
+  // TODO(D-01): registration model (self-service per PDF §3.1.1 vs. admin-provisioned per design Note) is unresolved.
+  // This schema supports either outcome:
+  //   - If self-service wins: loginId/createdByUserId stay null and organization_id may go unused.
+  //   - If admin-provisioned wins: login_id and created_by_user_id become required at the
+  //     application layer in Phase 02.
+  // Do NOT add a NOT NULL constraint to login_id or created_by_user_id until that decision is
+  // recorded in the Decision Register. Same reasoning applies to organization_id nullability.
+  //
+  // Field provenance:
+  //   password_hash      — nullable because no hashing logic exists in Phase 01; populated by Phase 02.
+  //   email_verified_at  — nullable; whether unverified users can sign in is still OPEN (D-17).
+  //   must_change_password — supports "system-generated password, user can change it" rule; populated in Phase 02.
+
+  @@map("users")
+}
+
+model EmployeeProfile {
+  id             String    @id @default(uuid()) @db.Uuid
+  userId         String    @unique @map("user_id") @db.Uuid
+  organizationId String?   @map("organization_id") @db.Uuid
+  name           String    @db.VarChar(255)
+  department     String?   @db.VarChar(255)
+  managerId      String?   @map("manager_id") @db.Uuid
+  location       String?   @db.VarChar(255)
+  dateOfJoining  DateTime? @map("date_of_joining") @db.Date
+  createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamp(3)
+  updatedAt      DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamp(3)
+
+  user         User              @relation(fields: [userId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  organization Organization?     @relation(fields: [organizationId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  manager      EmployeeProfile?  @relation("EmployeeManager", fields: [managerId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  reports      EmployeeProfile[] @relation("EmployeeManager")
+
+  // TODO(D-21): the exact employee-editable field set (PDF's narrow address/phone/picture vs. the
+  // design's broader-looking editable icons) is a Phase 4 concern, not a Phase 1 schema concern.
+  // The fields above are CORE IDENTITY FIELDS only (identification + linking); they are NOT a
+  // statement about editability. Resume/Private Info/Bank Details/Salary/Documents fields are
+  // deliberately absent — they belong to Phases 4 and 8.
+
+  // TODO(confirm delete behavior before Phase 3+): user -> profile uses ON DELETE RESTRICT so a
+  // User's Employee Profile is never cascade-deleted implicitly. Revisit once account-deletion
+  // semantics are decided.
+
+  @@map("employee_profiles")
+}

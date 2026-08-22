@@ -1,0 +1,22 @@
+# Dependencies
+node_modules/
+
+# Environment — never commit real secrets
+.env
+.env.local
+.env.*.local
+backend/.env
+frontend/.env
+frontend/.env.local
+
+# Build output
+dist/
+build/
+coverage/
+
+# Logs / OS
+*.log
+.DS_Store
+
+# Prisma generated client (regenerated on install)
+backend/src/generated/

@@ -1,0 +1,32 @@
+{
+  "name": "dayflow-backend",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Dayflow HRMS backend (Phase 01: foundational data model & environment)",
+  "main": "src/server.js",
+  "prisma": {
+    "schema": "src/db/schema.prisma"
+  },
+  "scripts": {
+    "start": "node src/server.js",
+    "dev": "node --watch src/server.js",
+    "migrate:dev": "prisma migrate dev",
+    "migrate:deploy": "prisma migrate deploy",
+    "migrate:down": "node scripts/migrate-down.js",
+    "db:test:setup": "node scripts/create-test-db.js",
+    "db:seed": "node src/db/seeds/dev-seed.js",
+    "generate": "prisma generate",
+    "test": "npm run db:test:setup && jest --runInBand"
+  },
+  "dependencies": {
+    "@prisma/client": "^6.5.0",
+    "dotenv": "^16.4.7",
+    "express": "^4.21.2"
+  },
+  "devDependencies": {
+    "jest": "^29.7.0",
+    "pg": "^8.13.1",
+    "prisma": "^6.5.0",
+    "supertest": "^7.0.0"
+  }
+}
