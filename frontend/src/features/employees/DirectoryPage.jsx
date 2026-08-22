@@ -111,12 +111,10 @@ function StatusIcon({ statusIcon }) {
 
 function EmployeeCard({ employee, isSelf }) {
   return (
-    // TODO(D-14): this will currently 403 for an Employee clicking a coworker's card, until D-14
-    // is resolved and Phase 04's GET /employees/:id guard is revisited. Do not silently work
-    // around this here (e.g. by hiding or disabling the click affordance for non-self cards
-    // when the viewer is an Employee) — that would hide a real product decision behind a UI
-    // choice. Leave the click live for every card and let the 403 surface; Phase 04's
-    // ProfilePage already renders an error notice rather than crashing when the fetch fails.
+    // [D-14 RESOLVED]: clicking any card — including a coworker's — now lands on
+    // /profile/:id and renders successfully in read-only mode; the backend no longer 403s a
+    // non-owner, non-admin caller here (see backend/src/modules/employees/routes.js). ProfilePage
+    // shows only the public subset (Resume tab) for a coworker viewer — see its computeTabSet.
     <Link className="employee-card" to={`/profile/${employee.id}`} title={isSelf ? `${employee.name} (you)` : employee.name}>
       {employee.avatarUrl ? (
         <img className="employee-card__avatar" src={`${API_BASE_URL}${employee.avatarUrl}`} alt="" />

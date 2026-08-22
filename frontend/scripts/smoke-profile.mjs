@@ -28,7 +28,7 @@ try {
   const { BankDetailsBlock } = await server.ssrLoadModule('/src/features/employees/BankDetailsBlock.jsx');
   const { SecurityStub } = await server.ssrLoadModule('/src/features/employees/tabs/SecurityStub.jsx');
 
-  // 1. computeTabSet — the three viewing contexts.
+  // 1. computeTabSet — the four viewing contexts ([D-14 RESOLVED] added the fourth).
   const employeeOwn = computeTabSet({ isOwnProfile: true, role: 'employee' });
   if (!employeeOwn.includes('security')) {
     fail(`Employee viewing own profile should see the Security tab, got: ${employeeOwn}`);
@@ -39,15 +39,24 @@ try {
     fail(`Admin viewing own profile should NOT see the Security tab, got: ${adminOwn}`);
   }
 
-  const otherAsEmployee = computeTabSet({ isOwnProfile: false, role: 'employee' });
+  // Admin viewing someone else — UNCHANGED by D-14: full tabs (still view-only), no Security.
   const otherAsAdmin = computeTabSet({ isOwnProfile: false, role: 'admin_hr' });
-  if (otherAsEmployee.includes('security') || otherAsAdmin.includes('security')) {
-    fail('Viewing someone else\'s profile should never show the Security tab, regardless of viewer role');
+  if (otherAsAdmin.includes('security')) {
+    fail(`Admin viewing someone else's profile should NOT see the Security tab, got: ${otherAsAdmin}`);
   }
-  for (const tabs of [employeeOwn, adminOwn, otherAsEmployee, otherAsAdmin]) {
+  for (const tabs of [employeeOwn, adminOwn, otherAsAdmin]) {
     if (!tabs.includes('resume') || !tabs.includes('private-info') || !tabs.includes('salary-info')) {
       fail(`Resume/Private Info/Salary Info must always be present, got: ${tabs}`);
     }
+  }
+
+  // [D-14 RESOLVED] A coworker (not owner, not admin_hr) viewing someone else's profile gets
+  // ONLY the Resume tab — Private Info, Salary Info, and Security must all be absent. The
+  // backend already narrows the DATA itself to PUBLIC_PROFILE_FIELDS for this exact caller; this
+  // asserts the frontend doesn't even offer tabs whose content it has nothing legitimate to show.
+  const otherAsEmployee = computeTabSet({ isOwnProfile: false, role: 'employee' });
+  if (otherAsEmployee.length !== 1 || otherAsEmployee[0] !== 'resume') {
+    fail(`A coworker viewing someone else's profile should see ONLY the Resume tab, got: ${otherAsEmployee}`);
   }
 
   // 2. Edit affordances only render when editable=true (own profile) — never for a view-only

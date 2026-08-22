@@ -15,6 +15,7 @@
     "migrate:down": "node scripts/migrate-down.js",
     "db:test:setup": "node scripts/create-test-db.js",
     "db:seed": "node src/db/seeds/dev-seed.js",
+    "demo:seed": "node scripts/demo-seed.js",
     "generate": "prisma generate",
     "test": "npm run db:test:setup && jest --runInBand"
   },

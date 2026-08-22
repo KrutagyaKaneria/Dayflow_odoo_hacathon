@@ -45,8 +45,9 @@ function withDecryptedBankDetails(profile) {
 const DEFAULT_PAGE_SIZE = 20;
 
 // Phase 05 — GET /employees. Deliberately minimal, safe-to-expose-broadly projection: see the
-// [RECOMMENDATION pending D-14] note in routes.js. Returns { id, name, avatarUrl, statusIcon }
-// per employee, never Private Info / Bank Details / anything Phase 04 guards. The projection
+// note in routes.js. Returns { id, name, avatarUrl, statusIcon } per employee, never Private
+// Info / Bank Details / anything else — unaffected by [D-14 RESOLVED], which only changed GET
+// /employees/:id's response shape. The projection
 // SHAPE is unchanged from Phase 05 — only statusIcon's value is now real (Phase 09, D-40 — see
 // modules/integration/deriveEmployeeStatus.js).
 async function listEmployees({ search, page = 1 } = {}) {

@@ -1,6 +1,8 @@
 /**
- * GET/PATCH /employees/:id. Phase 04 RBAC matrix (extends Phase 03's) — conservative D-14
- * default: only the profile owner or Admin/HR can reach this endpoint at all.
+ * GET/PATCH /employees/:id. Phase 04 RBAC matrix (extends Phase 03's), updated for [D-14
+ * RESOLVED]: GET is now open to any authenticated caller, with a field-level projection (owner/
+ * admin_hr get the full profile; anyone else gets PUBLIC_PROFILE_FIELDS only). PATCH is
+ * unaffected by D-14 and remains admin_hr-only.
  */
 const request = require('supertest');
 const { createApp } = require('../../src/app');
@@ -25,14 +27,20 @@ async function signIn(email, password) {
 }
 
 describe('GET /employees/:id', () => {
-  test('the owner can fetch their own profile by id', async () => {
-    const { user, password } = await createEmployeeWithProfile();
+  test('the owner can fetch their own profile by id — full profile, including Private Info and Bank Details keys', async () => {
+    const { user, password } = await createEmployeeWithProfile({
+      profileOverrides: { nationality: 'Indian' },
+      bankDetails: { accountNumber: '555666777' },
+    });
     const accessToken = await signIn(user.email, password);
 
     const res = await request(app).get(`/employees/${user.id}`).set('Authorization', `Bearer ${accessToken}`);
 
     expect(res.status).toBe(200);
     expect(res.body.profile.userId).toBe(user.id);
+    // [D-14 RESOLVED]: the owner-vs-coworker projection must not narrow the OWNER's own view.
+    expect(res.body.profile.nationality).toBe('Indian');
+    expect(res.body.profile.bankDetails.accountNumber).toBe('555666777');
   });
 
   test('an Admin can fetch any employee\'s profile by id', async () => {
@@ -49,20 +57,61 @@ describe('GET /employees/:id', () => {
     expect(res.body.profile.bankDetails.accountNumber).toBe('999888777');
   });
 
-  test('a different Employee is rejected with 403 — Bank Details never leak in the response', async () => {
+  test('[D-14 RESOLVED] a different Employee gets 200 with only the public subset — Private Info and Bank Details are ABSENT, not null', async () => {
     const { user: caller, password } = await createEmployeeWithProfile();
     const { user: target } = await createEmployeeWithProfile({
+      profileOverrides: {
+        department: 'Engineering',
+        location: 'Pune',
+        about: 'Loves TypeScript',
+        jobLikes: 'Debugging',
+        skills: ['React', 'Node'],
+        nationality: 'Secretland',
+        personalEmail: 'secret@example.com',
+        phone: '+1-555-0100',
+      },
       bankDetails: { accountNumber: '111222333', panNo: 'SECRET1234' },
     });
     const accessToken = await signIn(caller.email, password);
 
     const res = await request(app).get(`/employees/${target.id}`).set('Authorization', `Bearer ${accessToken}`);
 
-    expect(res.status).toBe(403);
-    expect(res.body.error.code).toBe('FORBIDDEN');
+    expect(res.status).toBe(200);
+    expect(res.body.profile).toEqual({
+      id: expect.any(String),
+      name: 'Test Employee',
+      avatarUrl: null,
+      department: 'Engineering',
+      managerId: null,
+      location: 'Pune',
+      about: 'Loves TypeScript',
+      jobLikes: 'Debugging',
+      skills: ['React', 'Node'],
+    });
+
+    // ABSENT, not null/undefined-valued — the keys themselves must not exist on the object.
+    for (const forbiddenKey of [
+      'bankDetails',
+      'phone',
+      'dateOfBirth',
+      'residingAddress',
+      'nationality',
+      'personalEmail',
+      'gender',
+      'maritalStatus',
+      'userId',
+      'organizationId',
+      'dateOfJoining',
+    ]) {
+      expect(Object.prototype.hasOwnProperty.call(res.body.profile, forbiddenKey)).toBe(false);
+    }
+
     const serialized = JSON.stringify(res.body);
     expect(serialized).not.toContain('111222333');
     expect(serialized).not.toContain('SECRET1234');
+    expect(serialized).not.toContain('Secretland');
+    expect(serialized).not.toContain('secret@example.com');
+    expect(serialized).not.toContain('+1-555-0100');
     expect(serialized).not.toContain('bankDetails');
   });
 

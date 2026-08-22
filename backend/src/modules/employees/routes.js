@@ -1,6 +1,6 @@
 const express = require('express');
 const { sendError } = require('../../shared/response');
-const { requireAuth, requireRole, requireSelfOrRole } = require('../../shared/auth');
+const { requireAuth, requireRole } = require('../../shared/auth');
 const { EmployeeError } = require('./errors');
 const {
   EMPLOYEE_EDITABLE_FIELDS,
@@ -8,6 +8,7 @@ const {
   ADMIN_EDITABLE_BANK_FIELDS,
   pickFields,
 } = require('./editPolicy');
+const { PUBLIC_PROFILE_FIELDS } = require('./publicProfilePolicy');
 const { singleAvatarUpload } = require('./avatarUpload');
 const service = require('./service');
 
@@ -67,23 +68,28 @@ function toProfileResponse(profile) {
   };
 }
 
+// [D-14 RESOLVED] The public subset a non-owner, non-admin coworker receives — built by
+// narrowing the SAME full response shape toProfileResponse produces, so there is exactly one
+// place ('id'/'name'/'department'/etc.) field names and mapping logic live. pickFields only
+// copies keys that exist on the source, so anything not in PUBLIC_PROFILE_FIELDS (bankDetails,
+// phone, dateOfBirth, residingAddress, nationality, personalEmail, gender, maritalStatus, ...) is
+// ABSENT from the result object — never present as null or an empty string.
+function toPublicProfileResponse(profile) {
+  return pickFields(toProfileResponse(profile), PUBLIC_PROFILE_FIELDS);
+}
+
 function validateSkills(fields) {
   if ('skills' in fields && !Array.isArray(fields.skills)) {
     throw new EmployeeError(400, 'VALIDATION_ERROR', 'skills must be an array.');
   }
 }
 
-// [RECOMMENDATION pending D-14] GET /employees (this phase's new listing endpoint) returns a
-// DELIBERATELY MINIMAL projection to any authenticated user, regardless of role: { id, name,
-// avatarUrl, statusIcon }. It does NOT return Private Info, Bank Details, Resume text, or
-// anything Phase 04 guards. Clicking a card navigates to /profile/:id (Phase 04's existing
-// route), which will correctly 403 for a non-owner, non-admin Employee per Phase 04's UNCHANGED
-// guard on GET /employees/:id below — this phase does not loosen that guard.
-// TODO(D-14): if the decision is that Employees CAN view coworkers' full profiles read-only,
-// Phase 04's requireSelfOrRole guard on GET /employees/:id needs a third branch (allow any
-// authenticated caller, but strip Private Info/Bank Details for non-owner-non-admin callers) —
-// that change belongs in Phase 04's code, not here. This phase's job is only to make the
-// directory itself functional without silently widening Phase 04's access control.
+// GET /employees (Phase 05's listing endpoint) returns a DELIBERATELY MINIMAL projection to any
+// authenticated user, regardless of role: { id, name, avatarUrl, statusIcon }. It does NOT return
+// Private Info, Bank Details, Resume text, or anything else — this listing projection is
+// unaffected by D-14 and stays exactly this minimal regardless of what GET /employees/:id below
+// returns to a coworker. Clicking a card navigates to /profile/:id — see the D-14 RESOLVED note
+// on GET /employees/:id below for what that route now returns to a non-owner, non-admin caller.
 //
 // TODO: no empty-state or zero-results handling is specified by either source for this list.
 // This returns a plain empty array on zero results and lets the frontend render its own
@@ -137,27 +143,21 @@ router.post(
   })
 );
 
-// employee_profiles is keyed 1:1 by user_id, and :id here addresses the user — the same
-// identifier space /employees/me resolves via req.user.id — so no DB lookup is needed to know
-// whose resource this is; requireSelfOrRole just needs the param itself.
-function getRouteUserId(req) {
-  return req.params.id;
-}
-
-// [D-14 still open, conservative default] Owner or Admin/HR only — the design's "view-only mode"
-// note doesn't say whether any authenticated Employee can open a coworker's profile, so this
-// phase does NOT allow that yet.
-// TODO(D-14): if the decision is that any authenticated Employee can view coworkers in
-// read-only mode, this guard needs a third branch (e.g., allow any authenticated user but strip
-// Private Info/Bank Details fields for non-owner-non-admin callers). Not built speculatively —
-// flagged only.
+// [D-14 RESOLVED] Any authenticated caller may open a coworker's profile read-only, but only the
+// owner or admin_hr receives the full profile — everyone else gets the PUBLIC_PROFILE_FIELDS
+// subset (see publicProfilePolicy.js / toPublicProfileResponse above). No 403 branch remains for
+// "authenticated but not owner/admin" — that used to be requireSelfOrRole's job; the
+// owner-vs-everyone-else distinction now lives entirely in this handler, as a projection choice,
+// not an authorization rejection. Salary (D-03, still OPEN) is untouched — it was never part of
+// this endpoint's response shape and PUBLIC_PROFILE_FIELDS does not add it.
 router.get(
   '/employees/:id',
   requireAuth,
-  requireSelfOrRole(getRouteUserId, 'admin_hr'),
   handle(async (req, res) => {
     const profile = await service.getProfileByUserId(req.params.id);
-    return res.status(200).json({ profile: toProfileResponse(profile) });
+    const isOwnerOrAdmin = req.user.id === profile.userId || req.user.role === 'admin_hr';
+    const body = isOwnerOrAdmin ? toProfileResponse(profile) : toPublicProfileResponse(profile);
+    return res.status(200).json({ profile: body });
   })
 );
 

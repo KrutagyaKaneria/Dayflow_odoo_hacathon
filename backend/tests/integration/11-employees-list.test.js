@@ -1,8 +1,8 @@
 /**
  * GET /employees — Phase 05 directory listing endpoint. Deliberately minimal projection,
- * safe to expose to any authenticated user regardless of role (see routes.js D-14 note).
- * Phase 04's GET /employees/:id guard is NOT touched by this phase — re-verified unchanged by
- * the full suite (see 10-employees-id.test.js) still passing alongside this file.
+ * safe to expose to any authenticated user regardless of role — this stays true regardless of
+ * [D-14 RESOLVED] (see routes.js), which changed GET /employees/:id's response shape, not this
+ * listing endpoint's. See 10-employees-id.test.js for the :id coverage.
  */
 const request = require('supertest');
 const { createApp } = require('../../src/app');

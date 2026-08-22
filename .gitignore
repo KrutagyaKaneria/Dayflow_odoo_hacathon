@@ -27,3 +27,6 @@ backend/uploads/
 # Phase 07 — locally-stored leave attachments (dev/test only, not committed; deliberately NOT
 # under backend/uploads/ — see modules/leave/attachmentUpload.js)
 backend/leave-attachments/
+
+# Demo seed output — real login IDs + passwords for seeded accounts, never committed.
+backend/seed-output.json
